@@ -4,8 +4,12 @@
 #include <stdio.h>
 
 // Unix includes.
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <unistd.h>
 #include <signal.h>
 #include <time.h>
+#include <errno.h>
 
 // Local includes.
 #include "arg_parse.h"
@@ -13,8 +17,7 @@
 #include "tcp_socket.h"
 #include "signal_handling.h"
 #include "globals.h"
-
-#define C_SIMPLE_HTTP_SLEEP_NANOS 1000000
+#include "constants.h"
 
 int main(int argc, char **argv) {
   Args args = parse_args(argc, argv);
@@ -27,12 +30,48 @@ int main(int argc, char **argv) {
   struct timespec sleep_time;
   sleep_time.tv_sec = 0;
   sleep_time.tv_nsec = C_SIMPLE_HTTP_SLEEP_NANOS;
+
+  struct sockaddr_in6 peer_info;
+  memset(&peer_info, 0, sizeof(struct sockaddr_in6));
+  peer_info.sin6_family = AF_INET6;
+
   signal(SIGINT, C_SIMPLE_HTTP_handle_sigint);
+
+  unsigned char recv_buf[C_SIMPLE_HTTP_RECV_BUF_SIZE];
+
+  int ret;
+  ssize_t read_ret;
+  socklen_t socket_len;
+
   while (C_SIMPLE_HTTP_KEEP_RUNNING) {
     nanosleep(&sleep_time, NULL);
+    socket_len = sizeof(struct sockaddr_in6);
+    ret = accept(tcp_socket, (struct sockaddr *)&peer_info, &socket_len);
+    if (ret == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+      // No connecting peers, do nothing.
+    } else if (ret == -1) {
+      printf("WARNING: accept: errno %d\n", errno);
+    } else if (ret >= 0) {
+      // Received connection, handle it.
+      int connection_fd = ret;
+      read_ret = read(connection_fd, recv_buf, C_SIMPLE_HTTP_RECV_BUF_SIZE);
+      // DEBUG print received buf.
+      // TODO Validate request and send response.
+      for (unsigned int idx = 0; idx < C_SIMPLE_HTTP_RECV_BUF_SIZE && idx < read_ret; ++idx) {
+        if (recv_buf[idx] >= 0x20 && recv_buf[idx] <= 0x7E) {
+          printf("%c", recv_buf[idx]);
+        } else {
+          break;
+        }
+      }
+      puts("");
+      close(connection_fd);
+    } else {
+      printf("WARNING: accept: Unknown invalid state!\n");
+    }
 #ifndef NDEBUG
-    printf(".");
-    fflush(stdout);
+    //printf(".");
+    //fflush(stdout);
 #endif
   }
 
