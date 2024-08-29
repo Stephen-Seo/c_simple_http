@@ -42,6 +42,9 @@ int main(int argc, char **argv) {
 
   __attribute__((cleanup(cleanup_tcp_socket))) int tcp_socket =
     create_tcp_socket(args.port);
+  if (tcp_socket == -1) {
+    return 1;
+  }
 
   struct timespec sleep_time;
   sleep_time.tv_sec = 0;
