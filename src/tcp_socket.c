@@ -74,7 +74,8 @@ int create_tcp_socket(unsigned short port) {
                  sizeof(struct sockaddr_in6));
   if (ret != 0) {
     close(tcp_socket);
-    puts("ERROR: Failed to bind socket!");
+    puts("ERROR: Failed to bind socket! (Maybe just attempted to reuse socket "
+         "that didn't get \"cleaned up\" yet? Use different port?)");
     return -1;
   }
 
