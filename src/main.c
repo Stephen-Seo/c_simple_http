@@ -21,7 +21,8 @@ int main(int argc, char **argv) {
 
   printf("%u\n", args.port);
 
-  __attribute__((cleanup(cleanup_tcp_socket))) int tcp_socket = create_tcp_socket(args.port);
+  __attribute__((cleanup(cleanup_tcp_socket))) int tcp_socket =
+    create_tcp_socket(args.port);
 
   struct timespec sleep_time;
   sleep_time.tv_sec = 0;

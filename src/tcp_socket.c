@@ -53,7 +53,9 @@ int create_tcp_socket(unsigned short port) {
     return -1;
   }
 
-  int ret = bind(tcp_socket, (const struct sockaddr *)&ipv6_addr, sizeof(struct sockaddr_in6));
+  int ret = bind(tcp_socket,
+                 (const struct sockaddr *)&ipv6_addr,
+                 sizeof(struct sockaddr_in6));
   if (ret != 0) {
     close(tcp_socket);
     puts("ERROR: Failed to bind socket!");
