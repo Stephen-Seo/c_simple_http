@@ -1,5 +1,5 @@
 COMMON_FLAGS = -Wall -Wextra -Wpedantic
-DEBUG_FLAGS = -Og
+DEBUG_FLAGS = -Og -g
 RELEASE_FLAGS = -O3 -DNDEBUG
 
 ifdef RELEASE
