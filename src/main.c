@@ -73,7 +73,9 @@ int main(int argc, char **argv) {
       read_ret = read(connection_fd, recv_buf, C_SIMPLE_HTTP_RECV_BUF_SIZE);
       // DEBUG print received buf.
       // TODO Validate request and send response.
-      for (unsigned int idx = 0; idx < C_SIMPLE_HTTP_RECV_BUF_SIZE && idx < read_ret; ++idx) {
+      for (unsigned int idx = 0;
+          idx < C_SIMPLE_HTTP_RECV_BUF_SIZE && idx < read_ret;
+          ++idx) {
         if (recv_buf[idx] >= 0x20 && recv_buf[idx] <= 0x7E) {
           printf("%c", recv_buf[idx]);
         } else {
