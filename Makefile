@@ -9,7 +9,13 @@ else
 endif
 
 SOURCES = \
-		src/main.c
+		src/main.c \
+		src/arg_parse.c \
+		src/big_endian.c \
+		src/tcp_socket.c \
+		src/signal_handling.c \
+		src/globals.c
+
 OBJECT_DIR = objs
 OBJECTS = $(addprefix ${OBJECT_DIR}/,$(patsubst %.c,%.c.o,${SOURCES}))
 
