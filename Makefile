@@ -1,4 +1,5 @@
 COMMON_FLAGS = -Wall -Wextra -Wpedantic \
+	-Ithird_party/SimpleArchiver/src \
 	-Ithird_party/SimpleArchiver/src/data_structures \
 	-Ithird_party/SimpleArchiver/src/algorithms
 DEBUG_FLAGS = -Og -g
@@ -17,6 +18,8 @@ SOURCES = \
 		src/tcp_socket.c \
 		src/signal_handling.c \
 		src/globals.c \
+		src/http.c \
+		third_party/SimpleArchiver/src/helpers.c \
 		third_party/SimpleArchiver/src/data_structures/linked_list.c \
 		third_party/SimpleArchiver/src/data_structures/hash_map.c \
 		third_party/SimpleArchiver/src/data_structures/priority_heap.c \
