@@ -28,15 +28,19 @@ SOURCES = \
 OBJECT_DIR = objs
 OBJECTS = $(addprefix ${OBJECT_DIR}/,$(patsubst %.c,%.c.o,${SOURCES}))
 
-all: c_simple_http
+all: c_simple_http unit_test
 
 c_simple_http: ${OBJECTS}
 	gcc -o c_simple_http ${CFLAGS} $^
+
+unit_test: $(filter-out ${OBJECT_DIR}/src/main.c.o,${OBJECTS}) ${OBJECT_DIR}/src/test.c.o
+	gcc -o unit_test ${CFLAGS} $^
 
 .PHONY: clean
 
 clean:
 	rm -f c_simple_http
+	rm -f unit_test
 	rm -rf ${OBJECT_DIR}
 
 ${OBJECT_DIR}/%.c.o: %.c

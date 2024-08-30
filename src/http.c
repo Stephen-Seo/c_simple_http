@@ -24,18 +24,64 @@
 #include <helpers.h>
 #include "constants.h"
 
-typedef struct HashMapWrapper {
-  SDArchiverHashMap *hash_map;
-} HashMapWrapper;
+#define SINGLE_QUOTE_DECREMENT() \
+  for(; single_quote_count > 0; --single_quote_count) { \
+    if ((state & 1) == 0) { \
+      key_buf[key_idx++] = '\''; \
+      if (key_idx >= C_SIMPLE_HTTP_CONFIG_BUF_SIZE) { \
+        fprintf(stderr, \
+                "ERROR: config file \"key\" is larger than %u bytes!\n", \
+                C_SIMPLE_HTTP_CONFIG_BUF_SIZE - 1); \
+        c_simple_http_clean_up_templates(&templates); \
+        templates.paths = NULL; \
+        return templates; \
+      } \
+    } else { \
+      value_buf[value_idx++] = '\''; \
+      if (value_idx >= C_SIMPLE_HTTP_CONFIG_BUF_SIZE) { \
+        fprintf(stderr, \
+                "ERROR: config file \"value\" is larger than %u bytes!\n", \
+                C_SIMPLE_HTTP_CONFIG_BUF_SIZE - 1); \
+        c_simple_http_clean_up_templates(&templates); \
+        templates.paths = NULL; \
+        return templates; \
+      } \
+    } \
+  }
+
+#define DOUBLE_QUOTE_DECREMENT() \
+  for(; double_quote_count > 0; --double_quote_count) { \
+    if ((state & 1) == 0) { \
+      key_buf[key_idx++] = '"'; \
+      if (key_idx >= C_SIMPLE_HTTP_CONFIG_BUF_SIZE) { \
+        fprintf(stderr, \
+                "ERROR: config file \"key\" is larger than %u bytes!\n", \
+                C_SIMPLE_HTTP_CONFIG_BUF_SIZE - 1); \
+        c_simple_http_clean_up_templates(&templates); \
+        templates.paths = NULL; \
+        return templates; \
+      } \
+    } else { \
+      value_buf[value_idx++] = '"'; \
+      if (value_idx >= C_SIMPLE_HTTP_CONFIG_BUF_SIZE) { \
+        fprintf(stderr, \
+                "ERROR: config file \"value\" is larger than %u bytes!\n", \
+                C_SIMPLE_HTTP_CONFIG_BUF_SIZE - 1); \
+        c_simple_http_clean_up_templates(&templates); \
+        templates.paths = NULL; \
+        return templates; \
+      } \
+    } \
+  }
 
 void c_simple_http_hash_map_wrapper_cleanup_hashmap_fn(void *data) {
   HashMapWrapper *wrapper = data;
-  simple_archiver_hash_map_free(&wrapper->hash_map);
+  simple_archiver_hash_map_free(&wrapper->paths);
   free(wrapper);
 }
 
 void c_simple_http_hash_map_wrapper_cleanup(HashMapWrapper *wrapper) {
-  simple_archiver_hash_map_free(&wrapper->hash_map);
+  simple_archiver_hash_map_free(&wrapper->paths);
   free(wrapper);
 }
 
@@ -60,19 +106,67 @@ HTTPTemplates c_simple_http_set_up_templates(const char *config_filename) {
   // xxx1 - reading value
   // xx0x - does not have "HTML" key
   // xx1x - does have "HTML" key
+  // 00xx - reading value is not quoted
+  // 01xx - reading value is single quoted
+  // 10xx - reading value is double quoted
   unsigned int state = 0;
+  unsigned char single_quote_count = 0;
+  unsigned char double_quote_count = 0;
   int c;
 
   while (feof(f) == 0) {
     c = fgetc(f);
     if (c == EOF) {
       break;
-    } else if (c == ' ' || c == '\t') {
-      // Ignore whitespace.
+    } else if ((state & 0xC) == 0 && (c == ' ' || c == '\t')) {
+      // Ignore whitespace when not quoted.
+      SINGLE_QUOTE_DECREMENT();
+      DOUBLE_QUOTE_DECREMENT();
       continue;
-    } else if ((state & 1) == 0 && (c == '\r' || c == '\n')) {
-      // Ignore newlines when parsing for key.
+    } else if ((state & 1) == 0
+        && (state & 0xC) == 0
+        && (c == '\r' || c == '\n')) {
+      // Ignore newlines when parsing for key and when not quoted.
+      SINGLE_QUOTE_DECREMENT();
+      DOUBLE_QUOTE_DECREMENT();
       continue;
+    } else if ((state & 1) == 1) {
+      if (c == '\'') {
+        ++single_quote_count;
+        DOUBLE_QUOTE_DECREMENT();
+
+        if (((state & 0xC) == 0x4 || (state & 0xC) == 0)
+            && single_quote_count >= C_SIMPLE_HTTP_QUOTE_COUNT_MAX) {
+          single_quote_count = 0;
+
+          // (state & 0xC) is known to be either 0x4 or 0.
+          if ((state & 0xC) == 0) {
+            state |= 0x4;
+          } else {
+            state &= 0xFFFFFFF3;
+          }
+        }
+        continue;
+      } else if (c == '"') {
+        ++double_quote_count;
+        SINGLE_QUOTE_DECREMENT();
+
+        if (((state & 0xC) == 0x8 || (state & 0xC) == 0)
+            && double_quote_count >= C_SIMPLE_HTTP_QUOTE_COUNT_MAX) {
+          double_quote_count = 0;
+
+          // (state & 0xC) is known to be either 0x8 or 0.
+          if ((state & 0xC) == 0) {
+            state |= 0x8;
+          } else {
+            state &= 0xFFFFFFF3;
+          }
+        }
+        continue;
+      } else {
+        SINGLE_QUOTE_DECREMENT();
+        DOUBLE_QUOTE_DECREMENT();
+      }
     }
     if ((state & 1) == 0) {
       if (c != '=') {
@@ -99,7 +193,7 @@ HTTPTemplates c_simple_http_set_up_templates(const char *config_filename) {
         state |= 1;
       }
     } else if ((state & 1) == 1) {
-      if (c != '\n' && c != '\r') {
+      if ((c != '\n' && c != '\r') || (state & 0xC) != 0) {
         value_buf[value_idx++] = c;
         if (value_idx >= C_SIMPLE_HTTP_CONFIG_BUF_SIZE) {
           fprintf(stderr,
@@ -165,15 +259,15 @@ HTTPTemplates c_simple_http_set_up_templates(const char *config_filename) {
           }
 
           HashMapWrapper *wrapper = malloc(sizeof(HashMapWrapper));
-          wrapper->hash_map = hash_map;
+          wrapper->paths = hash_map;
 
           if (simple_archiver_hash_map_insert(
               &templates.paths,
               wrapper,
               value,
               value_idx,
-              simple_archiver_helper_datastructure_cleanup_nop,
-              c_simple_http_hash_map_wrapper_cleanup_hashmap_fn) != 0) {
+              c_simple_http_hash_map_wrapper_cleanup_hashmap_fn,
+              simple_archiver_helper_datastructure_cleanup_nop) != 0) {
             fprintf(stderr,
                 "ERROR: Failed to insert new hash map for new PATH block!\n");
             c_simple_http_clean_up_templates(&templates);
@@ -253,7 +347,7 @@ HTTPTemplates c_simple_http_set_up_templates(const char *config_filename) {
             memcpy(value, value_buf, value_idx);
           }
 
-          if (simple_archiver_hash_map_insert(&hash_map_wrapper->hash_map,
+          if (simple_archiver_hash_map_insert(&hash_map_wrapper->paths,
                                               value,
                                               key,
                                               key_idx,

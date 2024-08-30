@@ -26,17 +26,20 @@ typedef struct HTTPTemplates {
   SDArchiverHashMap *paths;
 } HTTPTemplates;
 
+typedef HTTPTemplates HashMapWrapper;
+
 /// Each line in the config should be a key-value pair separated by an equals
-/// sign. All whitespace is ignored unless if the value is quoted. If there
-/// exists a line with the key "PATH", then the value must be a path like
-/// "/cache" and all the following key-value pairs are associated with that PATH
-/// until the next "PATH" key or EOF. Each "PATH" "block" should have a "HTML"
-/// key-value pair where the value is a HTML template. Inside such HTML
-/// templates should be strings like "{{{{example_key}}}}" which will be
-/// replaced by the string value of the key name deliminated by the four curly
-/// braces. "HTML_FILE" specifies a filename to read instead of using a literal
-/// string in the config file. It will store the contents of the specified file
-/// with the "HTML" key internally.
+/// sign. All whitespace is ignored unless if the value is quoted. A part of a
+/// string can be "quoted" if it is surrounded by three single-quotes or three
+/// double-quotes. If there exists a line with the key "PATH", then the value
+/// must be a path like "/cache" and all the following key-value pairs are
+/// associated with that PATH until the next "PATH" key or EOF. Each "PATH"
+/// "block" should have a "HTML" key-value pair where the value is a HTML
+/// template. Inside such HTML templates should be strings like
+/// "{{{{example_key}}}}" which will be replaced by the string value of the key
+/// name deliminated by the four curly braces. "HTML_FILE" specifies a filename
+/// to read instead of using a literal string in the config file. It will store
+/// the contents of the specified file with the "HTML" key internally.
 HTTPTemplates c_simple_http_set_up_templates(const char *config_filename);
 
 void c_simple_http_clean_up_templates(HTTPTemplates *templates);
