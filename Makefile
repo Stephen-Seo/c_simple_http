@@ -1,4 +1,6 @@
-COMMON_FLAGS = -Wall -Wextra -Wpedantic
+COMMON_FLAGS = -Wall -Wextra -Wpedantic \
+	-Ithird_party/SimpleArchiver/src/data_structures \
+	-Ithird_party/SimpleArchiver/src/algorithms
 DEBUG_FLAGS = -Og -g
 RELEASE_FLAGS = -O3 -DNDEBUG
 
@@ -14,7 +16,11 @@ SOURCES = \
 		src/big_endian.c \
 		src/tcp_socket.c \
 		src/signal_handling.c \
-		src/globals.c
+		src/globals.c \
+		third_party/SimpleArchiver/src/data_structures/linked_list.c \
+		third_party/SimpleArchiver/src/data_structures/hash_map.c \
+		third_party/SimpleArchiver/src/data_structures/priority_heap.c \
+		third_party/SimpleArchiver/src/algorithms/linear_congruential_gen.c
 
 OBJECT_DIR = objs
 OBJECTS = $(addprefix ${OBJECT_DIR}/,$(patsubst %.c,%.c.o,${SOURCES}))
