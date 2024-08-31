@@ -34,17 +34,14 @@ typedef struct C_SIMPLE_HTTP_ParsedConfig {
 typedef C_SIMPLE_HTTP_ParsedConfig C_SIMPLE_HTTP_HashMapWrapper;
 
 /// Each line in the config should be a key-value pair separated by an equals
-/// sign. All whitespace is ignored unless if the value is quoted. A part of a
-/// string can be "quoted" if it is surrounded by three single-quotes or three
-/// double-quotes. If there exists a line with the key "PATH", then the value
-/// must be a path like "/cache" and all the following key-value pairs are
-/// associated with that PATH until the next "PATH" key or EOF. Each "PATH"
-/// "block" should have a "HTML" key-value pair where the value is a HTML
-/// template. Inside such HTML templates should be strings like
-/// "{{{{example_key}}}}" which will be replaced by the string value of the key
-/// name deliminated by the four curly braces. "HTML_FILE" specifies a filename
-/// to read instead of using a literal string in the config file. It will store
-/// the contents of the specified file with the "HTML" key internally.
+/// sign "=". All whitespace is ignored unless if the value is "quoted". A part
+/// of a string can be "quoted" if it is surrounded by three single-quotes or
+/// three double-quotes. The "separating_key" separates lines of config into
+/// sections such that each key with the "separating_key" is the start of a new
+/// section. All key-value pairs after a "separating_key" belongs to that
+/// section. "required_names" is an optional list of c-strings that defines
+/// required keys for each section. If it is not desired to use
+/// "required_names", then pass NULL instead of a pointer.
 C_SIMPLE_HTTP_ParsedConfig c_simple_http_parse_config(
   const char *config_filename,
   const char *separating_key,
