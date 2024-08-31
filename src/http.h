@@ -17,7 +17,7 @@
 #ifndef SEODISPARATE_COM_C_SIMPLE_HTTP_HTTP_H_
 #define SEODISPARATE_COM_C_SIMPLE_HTTP_HTTP_H_
 
-#include <hash_map.h>
+#include <SimpleArchiver/src/data_structures/hash_map.h>
 
 typedef struct HTTPTemplates {
   /// Each entry in this data structure is a hash map where its value for the

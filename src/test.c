@@ -6,8 +6,8 @@
 #include "http.h"
 
 // Third party includes.
-#include <helpers.h>
-#include <hash_map.h>
+#include <SimpleArchiver/src/helpers.h>
+#include <SimpleArchiver/src/data_structures/hash_map.h>
 
 static int checks_checked = 0;
 static int checks_passed = 0;

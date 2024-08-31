@@ -1,7 +1,5 @@
 COMMON_FLAGS = -Wall -Wextra -Wpedantic \
-	-Ithird_party/SimpleArchiver/src \
-	-Ithird_party/SimpleArchiver/src/data_structures \
-	-Ithird_party/SimpleArchiver/src/algorithms
+	-Ithird_party
 DEBUG_FLAGS = -Og -g
 RELEASE_FLAGS = -O3 -DNDEBUG
 

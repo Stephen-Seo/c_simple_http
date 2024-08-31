@@ -21,7 +21,7 @@
 #include <string.h>
 
 // Local includes
-#include <helpers.h>
+#include <SimpleArchiver/src/helpers.h>
 #include "constants.h"
 
 #define SINGLE_QUOTE_DECREMENT() \
