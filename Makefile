@@ -17,6 +17,7 @@ SOURCES = \
 		src/signal_handling.c \
 		src/globals.c \
 		src/http.c \
+		src/config.c \
 		third_party/SimpleArchiver/src/helpers.c \
 		third_party/SimpleArchiver/src/data_structures/linked_list.c \
 		third_party/SimpleArchiver/src/data_structures/hash_map.c \

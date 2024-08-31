@@ -3,7 +3,7 @@
 #include <string.h>
 
 // Local includes.
-#include "http.h"
+#include "config.h"
 
 // Third party includes.
 #include <SimpleArchiver/src/helpers.h>
@@ -103,14 +103,39 @@ int main(void) {
     ASSERT_TRUE(
         fwrite("TEST5=\"\"\" '''one two '''three \"\"\"\n", 1, 34, test_file)
         == 34);
+    ASSERT_TRUE(
+        fwrite("PATH=/derp\nHTML=''' one two three '''\n", 1, 38, test_file)
+        == 38);
+    ASSERT_TRUE(
+        fwrite("TEST=''' \"one two \"three '''\n", 1, 29, test_file)
+        == 29);
+    ASSERT_TRUE(
+        fwrite("TEST2=' \"one two \"three ''\n", 1, 27, test_file)
+        == 27);
+    ASSERT_TRUE(
+        fwrite("PATH=/doop\n", 1, 11, test_file)
+        == 11);
+    ASSERT_TRUE(
+        fwrite("TEST3=something\n", 1, 16, test_file)
+        == 16);
+    ASSERT_TRUE(
+        fwrite("TEST2=' \"one two \"three ''\n", 1, 27, test_file)
+        == 27);
     simple_archiver_helper_cleanup_FILE(&test_file);
 
-    __attribute__((cleanup(c_simple_http_clean_up_templates)))
-    HTTPTemplates templates =
-      c_simple_http_set_up_templates(test_config_filename);
+    __attribute__((cleanup(simple_archiver_list_free)))
+    SDArchiverLinkedList *required_names = simple_archiver_list_init();
+    simple_archiver_list_add(
+      required_names,
+      "TEST2",
+      simple_archiver_helper_datastructure_cleanup_nop);
+
+    __attribute__((cleanup(c_simple_http_clean_up_parsed_config)))
+    C_SIMPLE_HTTP_ParsedConfig templates =
+      c_simple_http_parse_config(test_config_filename, "PATH", required_names);
     ASSERT_TRUE(templates.paths);
 
-    HashMapWrapper *first_path_map_wrapper =
+    C_SIMPLE_HTTP_ParsedConfig *first_path_map_wrapper =
       simple_archiver_hash_map_get(templates.paths, "/", 2);
     ASSERT_TRUE(first_path_map_wrapper);
 
@@ -154,6 +179,30 @@ int main(void) {
     ASSERT_TRUE(value);
     // printf("%s\n", value);
     ASSERT_STREQ(value, " '''one two '''three ");
+
+    simple_archiver_list_free(&required_names);
+    required_names = simple_archiver_list_init();
+    simple_archiver_list_add(
+      required_names,
+      "TEST3",
+      simple_archiver_helper_datastructure_cleanup_nop);
+
+    c_simple_http_clean_up_parsed_config(&templates);
+    templates =
+      c_simple_http_parse_config(test_config_filename, "PATH", required_names);
+    ASSERT_FALSE(templates.paths);
+
+    simple_archiver_list_free(&required_names);
+    required_names = simple_archiver_list_init();
+    simple_archiver_list_add(
+      required_names,
+      "TEST",
+      simple_archiver_helper_datastructure_cleanup_nop);
+
+    c_simple_http_clean_up_parsed_config(&templates);
+    templates =
+      c_simple_http_parse_config(test_config_filename, "PATH", required_names);
+    ASSERT_FALSE(templates.paths);
   }
 
   RETURN()
