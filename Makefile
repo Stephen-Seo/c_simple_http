@@ -9,6 +9,16 @@ else
 	CFLAGS = ${COMMON_FLAGS} ${DEBUG_FLAGS}
 endif
 
+HEADERS = \
+	src/arg_parse.h \
+	src/big_endian.h \
+	src/tcp_socket.h \
+	src/globals.h \
+	src/signal_handling.h \
+	src/constants.h \
+	src/http.h \
+	src/config.h
+
 SOURCES = \
 		src/main.c \
 		src/arg_parse.c \
@@ -42,6 +52,6 @@ clean:
 	rm -f unit_test
 	rm -rf ${OBJECT_DIR}
 
-${OBJECT_DIR}/%.c.o: %.c
+${OBJECT_DIR}/%.c.o: %.c ${HEADERS}
 	@mkdir -p $(dir $@)
 	gcc -o $@ -c ${CFLAGS} $<
