@@ -42,6 +42,23 @@ typedef C_SIMPLE_HTTP_ParsedConfig C_SIMPLE_HTTP_HashMapWrapper;
 /// section. "required_names" is an optional list of c-strings that defines
 /// required keys for each section. If it is not desired to use
 /// "required_names", then pass NULL instead of a pointer.
+///
+/// The returned wrapped hash-map is structured as follows: Each key is a
+/// c-string which corresponds to an existing value for a separating_key, and
+/// each value is a C_SIMPLE_HTTP_ParsedConfig pointer containing the key-value
+/// pairs from the config. For example, if the config is as follows:
+///
+/// PATH=/
+/// SOME_KEY=SOME_VALUE
+/// PATH=/inner
+/// SOME_OTHER_KEY=SOME_OTHER_VALUE
+///
+/// then the wrapped hash-map has "/" and "/inner" as keys (length including the
+/// zero-terminator of the c-string). The wrapped hash-map pointer in the
+/// C_SIMPLE_HTTP_ParsedConfig pointer corresponding to key "/" has key "PATH"
+/// to value "/" and has key "SOME_KEY" to value "SOME_VALUE". The wrapped
+/// hash-map pointer corresponding to key "/inner" has key "PATH" to value
+/// "/inner" and has key "SOME_OTHER_KEY" to value "SOME_OTHER_VALUE".
 C_SIMPLE_HTTP_ParsedConfig c_simple_http_parse_config(
   const char *config_filename,
   const char *separating_key,
