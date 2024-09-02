@@ -34,6 +34,7 @@
 #include "signal_handling.h"
 #include "globals.h"
 #include "constants.h"
+#include "http.h"
 
 int main(int argc, char **argv) {
   Args args = parse_args(argc, argv);
@@ -83,17 +84,24 @@ int main(int argc, char **argv) {
       int connection_fd = ret;
       read_ret = read(connection_fd, recv_buf, C_SIMPLE_HTTP_RECV_BUF_SIZE);
       // DEBUG print received buf.
-      // TODO Validate request and send response.
       for (unsigned int idx = 0;
           idx < C_SIMPLE_HTTP_RECV_BUF_SIZE && idx < read_ret;
           ++idx) {
-        if (recv_buf[idx] >= 0x20 && recv_buf[idx] <= 0x7E) {
+        if ((recv_buf[idx] >= 0x20 && recv_buf[idx] <= 0x7E)
+            || recv_buf[idx] == '\n' || recv_buf[idx] == '\r') {
           printf("%c", recv_buf[idx]);
         } else {
           break;
         }
       }
       puts("");
+      // TODO Validate request and send response.
+      // TODO WIP
+      const char *response = c_simple_http_request_response(
+        (const char*)recv_buf, read_ret, NULL);
+      if (response) {
+        free((void*)response);
+      }
       close(connection_fd);
     } else {
       printf("WARNING: accept: Unknown invalid state!\n");
