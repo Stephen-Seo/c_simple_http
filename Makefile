@@ -17,7 +17,8 @@ HEADERS = \
 	src/signal_handling.h \
 	src/constants.h \
 	src/http.h \
-	src/config.h
+	src/config.h \
+	src/http_template.h
 
 SOURCES = \
 		src/main.c \
@@ -28,6 +29,7 @@ SOURCES = \
 		src/globals.c \
 		src/http.c \
 		src/config.c \
+		src/http_template.c \
 		third_party/SimpleArchiver/src/helpers.c \
 		third_party/SimpleArchiver/src/data_structures/linked_list.c \
 		third_party/SimpleArchiver/src/data_structures/hash_map.c \
