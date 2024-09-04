@@ -121,8 +121,8 @@ int c_simple_http_required_iter_fn(void *data, void *ud) {
 }
 
 typedef struct C_SIMPLE_HTTP_INTERNAL_RequiredCheck {
-  SDArchiverHashMap *map_of_paths_and_their_vars;
-  SDArchiverLinkedList *required;
+  const SDArchiverHashMap *map_of_paths_and_their_vars;
+  const SDArchiverLinkedList *required;
 } C_SIMPLE_HTTP_INTERNAL_RequiredCheck;
 
 int c_simple_http_check_required_iter_fn(void *path_void_str, void *ud) {
@@ -150,7 +150,7 @@ int c_simple_http_check_required_iter_fn(void *path_void_str, void *ud) {
 C_SIMPLE_HTTP_ParsedConfig c_simple_http_parse_config(
   const char *config_filename,
   const char *separating_key,
-  SDArchiverLinkedList *required_names
+  const SDArchiverLinkedList *required_names
 ) {
   C_SIMPLE_HTTP_ParsedConfig config;
   config.hash_map = NULL;

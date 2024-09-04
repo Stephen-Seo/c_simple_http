@@ -62,7 +62,7 @@ typedef C_SIMPLE_HTTP_ParsedConfig C_SIMPLE_HTTP_HashMapWrapper;
 C_SIMPLE_HTTP_ParsedConfig c_simple_http_parse_config(
   const char *config_filename,
   const char *separating_key,
-  SDArchiverLinkedList *required_names
+  const SDArchiverLinkedList *required_names
 );
 
 void c_simple_http_clean_up_parsed_config(C_SIMPLE_HTTP_ParsedConfig *config);

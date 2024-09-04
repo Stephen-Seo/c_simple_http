@@ -154,9 +154,12 @@ char *c_simple_http_path_to_generated(
             last_template_idx = last_node->orig_end_idx;
           }
           template_node = malloc(sizeof(C_SIMPLE_HTTP_INTERNAL_Template_Node));
-          template_node->html = malloc(idx - last_template_idx);
-          memcpy(template_node->html, html_buf + idx, idx - last_template_idx);
-          template_node->html_size = idx - last_template_idx;
+          template_node->html_size = idx - last_template_idx - 2;
+          template_node->html = malloc(template_node->html_size);
+          memcpy(
+            template_node->html,
+            html_buf + last_template_idx,
+            template_node->html_size);
           template_node->orig_end_idx = idx + 1;
           template_node->forced_next = NULL;
           simple_archiver_list_add(template_html_list, template_node,
@@ -176,21 +179,12 @@ char *c_simple_http_path_to_generated(
           state &= 0xFFFFFFFE;
           C_SIMPLE_HTTP_INTERNAL_Template_Node *last_node =
             template_html_list->tail->prev->data;
-          size_t end_of_var_size =
-            idx - last_node->orig_end_idx;
-          if (end_of_var_size <= 6) {
-            fprintf(
-              stderr,
-              "ERROR generating from html template, invalid delimeter at index "
-              "%lu!\n",
-              idx);
-            return NULL;
-          }
-          size_t var_size = end_of_var_size - 6;
+          size_t var_size = idx - 2 - last_node->orig_end_idx;
+          __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
           char *var = malloc(var_size + 1);
           memcpy(
             var,
-            html_buf + last_node->orig_end_idx + 3,
+            html_buf + last_node->orig_end_idx,
             var_size);
           var[var_size] = 0;
           const char *value_c_str =

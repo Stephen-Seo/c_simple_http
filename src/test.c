@@ -1,9 +1,11 @@
 // Standard library includes.
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
 // Local includes.
 #include "config.h"
+#include "http_template.h"
 
 // Third party includes.
 #include <SimpleArchiver/src/helpers.h>
@@ -78,7 +80,7 @@ static int checks_passed = 0;
   } while (0);
 
 int main(void) {
-  // Test set up templates.
+  // Test config.
   {
     const char *test_config_filename = "/tmp/c_simple_http_test.config";
     __attribute__((cleanup(simple_archiver_helper_cleanup_FILE)))
@@ -203,6 +205,76 @@ int main(void) {
     templates =
       c_simple_http_parse_config(test_config_filename, "PATH", required_names);
     ASSERT_FALSE(templates.paths);
+  }
+
+  // Test http_template.
+  {
+    const char *test_http_template_filename =
+      "/tmp/c_simple_http_template_test.config";
+    __attribute__((cleanup(simple_archiver_helper_cleanup_FILE)))
+    FILE *test_file = fopen(test_http_template_filename, "w");
+    ASSERT_TRUE(test_file);
+
+    ASSERT_TRUE(
+        fwrite("PATH=/\nHTML=<h1>Test</h1>\n", 1, 26, test_file)
+        == 26);
+    simple_archiver_helper_cleanup_FILE(&test_file);
+
+    __attribute__((cleanup(simple_archiver_list_free)))
+    SDArchiverLinkedList *required_names = simple_archiver_list_init();
+    simple_archiver_list_add(
+      required_names,
+      "HTML",
+      simple_archiver_helper_datastructure_cleanup_nop
+    );
+
+    __attribute__((cleanup(c_simple_http_clean_up_parsed_config)))
+    C_SIMPLE_HTTP_ParsedConfig config = c_simple_http_parse_config(
+      test_http_template_filename,
+      "PATH",
+      required_names
+    );
+    ASSERT_TRUE(config.paths != NULL);
+
+    __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
+    char *buf = c_simple_http_path_to_generated("/", &config);
+    ASSERT_TRUE(buf != NULL);
+    ASSERT_TRUE(strcmp(buf, "<h1>Test</h1>") == 0);
+    simple_archiver_helper_cleanup_c_string(&buf);
+
+    const char *test_http_template_filename2 =
+      "/tmp/c_simple_http_template_test2.config";
+    test_file = fopen(test_http_template_filename2, "w");
+    ASSERT_TRUE(test_file);
+
+    ASSERT_TRUE(
+        fwrite(
+          "PATH=/\nHTML=<h1>{{{testVar}}}</h1><br><h2>{{{testVar2}}}</h2>\n",
+          1,
+          62,
+          test_file)
+        == 62);
+    ASSERT_TRUE(
+        fwrite("testVar=''' Some text. '''\n", 1, 27, test_file)
+        == 27);
+    ASSERT_TRUE(
+        fwrite("testVar2=''' More text. '''\n", 1, 28, test_file)
+        == 28);
+    simple_archiver_helper_cleanup_FILE(&test_file);
+
+    c_simple_http_clean_up_parsed_config(&config);
+    config = c_simple_http_parse_config(
+      test_http_template_filename2,
+      "PATH",
+      required_names
+    );
+    ASSERT_TRUE(config.paths != NULL);
+
+    buf = c_simple_http_path_to_generated("/", &config);
+    ASSERT_TRUE(buf != NULL);
+    printf("%s\n", buf);
+    ASSERT_TRUE(strcmp(buf, "<h1> Some text. </h1><br><h2> More text. </h2>") == 0);
+    simple_archiver_helper_cleanup_c_string(&buf);
   }
 
   RETURN()
