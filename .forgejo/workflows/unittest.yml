@@ -1,0 +1,20 @@
+name: Run Unit Tests
+on:
+  push:
+    branches:
+      - '*'
+
+jobs:
+  build-and-run-unit-tests:
+    runs-on: any_archLinux
+    steps:
+      - name: Get repo
+        run: git clone --depth=1 --no-single-branch https://git.seodisparate.com/stephenseo/c_simple_http.git c_simple_http
+      - name: Checkout the branch
+        run: cd c_simple_http && git checkout "${GITHUB_REF_NAME}"
+      - name: Get submodules
+        run: cd c_simple_http && git submodule update --init --recursive --depth=1 --no-single-branch
+      - name: Build
+        run: make -C c_simple_http
+      - name: Run unit tests
+        run: ./c_simple_http/unit_test
