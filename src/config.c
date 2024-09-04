@@ -395,48 +395,8 @@ C_SIMPLE_HTTP_ParsedConfig c_simple_http_parse_config(
 
           unsigned char *key = malloc(key_idx);
           memcpy(key, key_buf, key_idx);
-          unsigned char *value;
-          if (strcmp((char*)key_buf, "HTML_FILE") == 0) {
-            __attribute__((cleanup(simple_archiver_helper_cleanup_FILE)))
-            FILE *html_file = fopen((char*)value_buf, "r");
-            if (!html_file) {
-              fprintf(stderr,
-                "ERROR: Internal error failed to open HTML_FILE \"%s\"!",
-                value_buf);
-              c_simple_http_clean_up_parsed_config(&config);
-              config.hash_map = NULL;
-              return config;
-            }
-
-            fseek(html_file, 0, SEEK_END);
-            long file_size = ftell(html_file);
-            if (file_size <= 0) {
-              fprintf(stderr,
-                "ERROR: Internal error HTML_FILE \"%s\" is invalid size!",
-                value_buf);
-              c_simple_http_clean_up_parsed_config(&config);
-              config.hash_map = NULL;
-              return config;
-            }
-            fseek(html_file, 0, SEEK_SET);
-            unsigned long file_size_u = file_size;
-
-            unsigned char *read_buf = malloc(file_size_u);
-            size_t read_amount = 0;
-            read_amount = fread(read_buf, 1, file_size_u, html_file);
-            if (read_amount != file_size_u) {
-              fprintf(stderr, "ERROR: Failed to read HTML_FILE \"%s\"!\n",
-                value_buf);
-              free(read_buf);
-              c_simple_http_clean_up_parsed_config(&config);
-              config.hash_map = NULL;
-              return config;
-            }
-            value = read_buf;
-          } else {
-            value = malloc(value_idx);
-            memcpy(value, value_buf, value_idx);
-          }
+          unsigned char *value = malloc(value_idx);
+          memcpy(value, value_buf, value_idx);
 
           if (simple_archiver_hash_map_insert(&hash_map_wrapper->paths,
                                               value,

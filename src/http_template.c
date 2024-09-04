@@ -248,7 +248,7 @@ char *c_simple_http_path_to_generated(
       return NULL;
     }
     C_SIMPLE_HTTP_INTERNAL_Template_Node to_fill;
-    to_fill.html = malloc(final_size);
+    to_fill.html = malloc(final_size + 1);
     to_fill.html_size = 0;
     to_fill.html_capacity = final_size;
     if (simple_archiver_list_get(
@@ -259,6 +259,7 @@ char *c_simple_http_path_to_generated(
       free(to_fill.html);
       return NULL;
     }
+    to_fill.html[final_size] = 0;
     return to_fill.html;
   } else {
     // Prevent cleanup fn from "free"ing html_buf and return it verbatim.

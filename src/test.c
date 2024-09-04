@@ -279,6 +279,66 @@ int main(void) {
         "<h1> Some text. </h1><br><h2> More text. </h2>")
       == 0);
     simple_archiver_helper_cleanup_c_string(&buf);
+
+    const char *test_http_template_filename3 =
+      "/tmp/c_simple_http_template_test3.config";
+    const char *test_http_template_html_filename =
+      "/tmp/c_simple_http_template_test.html";
+    test_file = fopen(test_http_template_filename3, "w");
+    ASSERT_TRUE(test_file);
+
+    ASSERT_TRUE(
+        fwrite(
+          "PATH=/\nHTML_FILE=/tmp/c_simple_http_template_test.html\n",
+          1,
+          55,
+          test_file)
+        == 55);
+    ASSERT_TRUE(
+        fwrite(
+          "testVar=''' testVar text. '''\ntestVar2=''' testVar2 text. '''\n",
+          1,
+          62,
+          test_file)
+        == 62);
+    simple_archiver_helper_cleanup_FILE(&test_file);
+
+    test_file = fopen(test_http_template_html_filename, "w");
+    ASSERT_TRUE(test_file);
+
+    ASSERT_TRUE(
+        fwrite(
+          "<h1>{{{testVar}}}</h1><br><h2>{{{testVar2}}}</h2>",
+          1,
+          49,
+          test_file)
+        == 49);
+    simple_archiver_helper_cleanup_FILE(&test_file);
+
+    simple_archiver_list_free(&required_names);
+    required_names = simple_archiver_list_init();
+    simple_archiver_list_add(
+      required_names,
+      "HTML_FILE",
+      simple_archiver_helper_datastructure_cleanup_nop);
+
+    c_simple_http_clean_up_parsed_config(&config);
+    config = c_simple_http_parse_config(
+      test_http_template_filename3,
+      "PATH",
+      required_names
+    );
+    ASSERT_TRUE(config.paths != NULL);
+
+    buf = c_simple_http_path_to_generated("/", &config);
+    ASSERT_TRUE(buf != NULL);
+    printf("%s\n", buf);
+    ASSERT_TRUE(
+      strcmp(
+        buf,
+        "<h1> testVar text. </h1><br><h2> testVar2 text. </h2>")
+      == 0);
+    simple_archiver_helper_cleanup_c_string(&buf);
   }
 
   RETURN()
