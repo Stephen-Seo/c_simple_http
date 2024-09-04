@@ -273,7 +273,11 @@ int main(void) {
     buf = c_simple_http_path_to_generated("/", &config);
     ASSERT_TRUE(buf != NULL);
     printf("%s\n", buf);
-    ASSERT_TRUE(strcmp(buf, "<h1> Some text. </h1><br><h2> More text. </h2>") == 0);
+    ASSERT_TRUE(
+      strcmp(
+        buf,
+        "<h1> Some text. </h1><br><h2> More text. </h2>")
+      == 0);
     simple_archiver_helper_cleanup_c_string(&buf);
   }
 
