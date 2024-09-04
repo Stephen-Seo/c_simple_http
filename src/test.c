@@ -120,9 +120,11 @@ int main(void) {
     ASSERT_TRUE(
         fwrite("TEST3=something\n", 1, 16, test_file)
         == 16);
+    // No endline at the end of file to check for case where the config file
+    // has no endline.
     ASSERT_TRUE(
-        fwrite("TEST2=' \"one two \"three ''\n", 1, 27, test_file)
-        == 27);
+        fwrite("TEST2=' \"one two \"three ''", 1, 26, test_file)
+        == 26);
     simple_archiver_helper_cleanup_FILE(&test_file);
 
     __attribute__((cleanup(simple_archiver_list_free)))
