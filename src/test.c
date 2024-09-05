@@ -248,10 +248,13 @@ int main(void) {
     );
     ASSERT_TRUE(config.paths != NULL);
 
+    size_t output_buf_size;
+
     __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
-    char *buf = c_simple_http_path_to_generated("/", &config);
+    char *buf = c_simple_http_path_to_generated("/", &config, &output_buf_size);
     ASSERT_TRUE(buf != NULL);
     ASSERT_TRUE(strcmp(buf, "<h1>Test</h1>") == 0);
+    CHECK_TRUE(output_buf_size == 14);
     simple_archiver_helper_cleanup_c_string(&buf);
 
     __attribute__((cleanup(test_internal_cleanup_delete_temporary_file)))
@@ -283,7 +286,7 @@ int main(void) {
     );
     ASSERT_TRUE(config.paths != NULL);
 
-    buf = c_simple_http_path_to_generated("/", &config);
+    buf = c_simple_http_path_to_generated("/", &config, &output_buf_size);
     ASSERT_TRUE(buf != NULL);
     printf("%s\n", buf);
     ASSERT_TRUE(
@@ -291,6 +294,7 @@ int main(void) {
         buf,
         "<h1> Some text. </h1><br><h2> More text. </h2>")
       == 0);
+    CHECK_TRUE(output_buf_size == 47);
     simple_archiver_helper_cleanup_c_string(&buf);
 
     __attribute__((cleanup(test_internal_cleanup_delete_temporary_file)))
@@ -345,7 +349,7 @@ int main(void) {
     );
     ASSERT_TRUE(config.paths != NULL);
 
-    buf = c_simple_http_path_to_generated("/", &config);
+    buf = c_simple_http_path_to_generated("/", &config, &output_buf_size);
     ASSERT_TRUE(buf != NULL);
     printf("%s\n", buf);
     ASSERT_TRUE(
@@ -353,6 +357,7 @@ int main(void) {
         buf,
         "<h1> testVar text. </h1><br><h2> testVar2 text. </h2>")
       == 0);
+    CHECK_TRUE(output_buf_size == 53);
     simple_archiver_helper_cleanup_c_string(&buf);
 
     __attribute__((cleanup(test_internal_cleanup_delete_temporary_file)))
@@ -427,7 +432,7 @@ int main(void) {
     );
     ASSERT_TRUE(config.paths != NULL);
 
-    buf = c_simple_http_path_to_generated("/", &config);
+    buf = c_simple_http_path_to_generated("/", &config, &output_buf_size);
     ASSERT_TRUE(buf != NULL);
     printf("%s\n", buf);
     ASSERT_TRUE(
@@ -435,6 +440,7 @@ int main(void) {
         buf,
         "<h1> some test text in test var file. </h1>")
       == 0);
+    CHECK_TRUE(output_buf_size == 43);
     simple_archiver_helper_cleanup_c_string(&buf);
   }
 

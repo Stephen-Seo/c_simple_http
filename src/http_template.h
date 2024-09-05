@@ -19,11 +19,17 @@
 
 #include "http.h"
 
+// Standard library includes.
+#include <stddef.h>
+
 // Returns non-NULL on success, which must be free'd after use.
 // Takes a path string and templates and returns the generated HTML.
+// If "output_buf_size" is non-NULL, it will be set to the size of the returned
+// buffer.
 char *c_simple_http_path_to_generated(
   const char *path,
-  const C_SIMPLE_HTTP_HTTPTemplates *templates);
+  const C_SIMPLE_HTTP_HTTPTemplates *templates,
+  size_t *output_buf_size);
 
 #endif
 

@@ -98,7 +98,11 @@ int c_simple_http_internal_ends_with_FILE(const char *c_string) {
 
 char *c_simple_http_path_to_generated(
     const char *path,
-    const C_SIMPLE_HTTP_HTTPTemplates *templates) {
+    const C_SIMPLE_HTTP_HTTPTemplates *templates,
+    size_t *output_buf_size) {
+  if (output_buf_size) {
+    *output_buf_size = 0;
+  }
   C_SIMPLE_HTTP_ParsedConfig *wrapped_hash_map =
     simple_archiver_hash_map_get(templates->hash_map, path, strlen(path) + 1);
   if (!wrapped_hash_map) {
@@ -157,7 +161,7 @@ char *c_simple_http_path_to_generated(
   size_t delimeter_count = 0;
 
   // xxxx xxx0 - Initial state, no delimeter reached.
-  // xxxx xxx1 - Three "{" delimeters reached.
+  // xxxx xxx1 - Three left-curly-brace delimeters reached.
   unsigned int state = 0;
 
   for (; idx < html_buf_size; ++idx) {
@@ -321,11 +325,17 @@ char *c_simple_http_path_to_generated(
       return NULL;
     }
     to_fill.html[final_size] = 0;
+    if (output_buf_size) {
+      *output_buf_size = final_size;
+    }
     return to_fill.html;
   } else {
     // Prevent cleanup fn from "free"ing html_buf and return it verbatim.
     char *buf = html_buf;
     html_buf = NULL;
+    if (output_buf_size) {
+      *output_buf_size = html_buf_size;
+    }
     return buf;
   }
 }
