@@ -145,7 +145,7 @@ char *c_simple_http_path_to_generated(
     size_t stored_html_size = strlen(stored_html) + 1;
     html_buf = malloc(stored_html_size);
     memcpy(html_buf, stored_html, stored_html_size);
-    html_buf_size = stored_html_size;
+    html_buf_size = stored_html_size - 1;
   }
 
   // At this point, html_buf contains the raw HTML as a C-string.

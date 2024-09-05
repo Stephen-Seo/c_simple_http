@@ -254,7 +254,7 @@ int main(void) {
     char *buf = c_simple_http_path_to_generated("/", &config, &output_buf_size);
     ASSERT_TRUE(buf != NULL);
     ASSERT_TRUE(strcmp(buf, "<h1>Test</h1>") == 0);
-    CHECK_TRUE(output_buf_size == 14);
+    CHECK_TRUE(output_buf_size == 13);
     simple_archiver_helper_cleanup_c_string(&buf);
 
     __attribute__((cleanup(test_internal_cleanup_delete_temporary_file)))
@@ -294,7 +294,7 @@ int main(void) {
         buf,
         "<h1> Some text. </h1><br><h2> More text. </h2>")
       == 0);
-    CHECK_TRUE(output_buf_size == 47);
+    CHECK_TRUE(output_buf_size == 46);
     simple_archiver_helper_cleanup_c_string(&buf);
 
     __attribute__((cleanup(test_internal_cleanup_delete_temporary_file)))
