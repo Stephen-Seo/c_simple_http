@@ -76,6 +76,26 @@ int c_simple_http_internal_fill_buf_fn(void *data, void *ud) {
   return 0;
 }
 
+/// Returns 0 if "c_string" ends with "_FILE".
+int c_simple_http_internal_ends_with_FILE(const char *c_string) {
+  if (!c_string) {
+    return 1;
+  }
+
+  const char *comparison_string = "_FILE";
+
+  const size_t c_string_size = strlen(c_string);
+
+  if (strcmp(
+      comparison_string,
+      c_string + (c_string_size - strlen(comparison_string)))
+        == 0) {
+    return 0;
+  }
+
+  return 2;
+}
+
 char *c_simple_http_path_to_generated(
     const char *path,
     const C_SIMPLE_HTTP_HTTPTemplates *templates) {
@@ -192,17 +212,58 @@ char *c_simple_http_path_to_generated(
               wrapped_hash_map->hash_map,
               var,
               var_size + 1);
-          // TODO Impl. loading from file instead of directly from value.
-          // Perhaps do this if "var" ends with "_FILE".
           if (value_c_str) {
-            template_node =
-              malloc(sizeof(C_SIMPLE_HTTP_INTERNAL_Template_Node));
-            size_t size = strlen(value_c_str);
-            template_node->html = malloc(size);
-            memcpy(template_node->html, value_c_str, size);
-            template_node->html_size = size;
-            template_node->orig_end_idx = idx + 1;
-            template_node->forced_next = NULL;
+            if (c_simple_http_internal_ends_with_FILE(var) == 0) {
+              // Load from file specified by "value_c_str".
+              __attribute__((cleanup(simple_archiver_helper_cleanup_FILE)))
+              FILE *f = fopen(value_c_str, "r");
+              if (!f) {
+                fprintf(stderr, "ERROR Failed to open file \"%s\"!\n",
+                        value_c_str);
+                return NULL;
+              } else if (fseek(f, 0, SEEK_END) != 0) {
+                fprintf(stderr, "ERROR Failed to seek to end of file \"%s\"!\n",
+                        value_c_str);
+                return NULL;
+              }
+              long file_size = ftell(f);
+              if (file_size <= 0) {
+                fprintf(stderr, "ERROR Size of file \"%s\" is invalid!\n",
+                        value_c_str);
+                return NULL;
+              } else if (fseek(f, 0, SEEK_SET) != 0) {
+                fprintf(stderr, "ERROR Failed to seek to start of file "
+                        "\"%s\"!\n",
+                        value_c_str);
+                return NULL;
+              }
+              template_node =
+                malloc(sizeof(C_SIMPLE_HTTP_INTERNAL_Template_Node));
+              template_node->html_size = (size_t)file_size;
+              template_node->html = malloc(template_node->html_size);
+              template_node->orig_end_idx = idx + 1;
+              template_node->forced_next = NULL;
+
+              if (fread(template_node->html,
+                        template_node->html_size,
+                        1,
+                        f)
+                    != 1) {
+                fprintf(stderr, "ERROR Failed to read from file \"%s\"!\n",
+                        value_c_str);
+                return NULL;
+              }
+            } else {
+              // Variable data is "value_c_str".
+              template_node =
+                malloc(sizeof(C_SIMPLE_HTTP_INTERNAL_Template_Node));
+              size_t size = strlen(value_c_str);
+              template_node->html = malloc(size);
+              memcpy(template_node->html, value_c_str, size);
+              template_node->html_size = size;
+              template_node->orig_end_idx = idx + 1;
+              template_node->forced_next = NULL;
+            }
           } else {
             template_node =
               malloc(sizeof(C_SIMPLE_HTTP_INTERNAL_Template_Node));
