@@ -1,3 +1,5 @@
+CC ?= gcc
+
 COMMON_FLAGS = -Wall -Wextra -Wpedantic \
 	-Ithird_party
 DEBUG_FLAGS = -Og -g
@@ -42,10 +44,10 @@ OBJECTS = $(addprefix ${OBJECT_DIR}/,$(patsubst %.c,%.c.o,${SOURCES}))
 all: c_simple_http unit_test
 
 c_simple_http: ${OBJECTS}
-	gcc -o c_simple_http ${CFLAGS} $^
+	${CC} -o c_simple_http ${CFLAGS} $^
 
 unit_test: $(filter-out ${OBJECT_DIR}/src/main.c.o,${OBJECTS}) ${OBJECT_DIR}/src/test.c.o
-	gcc -o unit_test ${CFLAGS} $^
+	${CC} -o unit_test ${CFLAGS} $^
 
 .PHONY: clean
 
@@ -56,4 +58,4 @@ clean:
 
 ${OBJECT_DIR}/%.c.o: %.c ${HEADERS}
 	@mkdir -p $(dir $@)
-	gcc -o $@ -c ${CFLAGS} $<
+	${CC} -o $@ -c ${CFLAGS} $<
