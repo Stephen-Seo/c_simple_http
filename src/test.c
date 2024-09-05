@@ -79,9 +79,18 @@ static int checks_passed = 0;
     }                                                                        \
   } while (0);
 
+void test_internal_cleanup_delete_temporary_file(const char **filename) {
+  if (filename && *filename) {
+    if (remove(*filename) != 0) {
+      fprintf(stderr, "ERROR Failed to remove file \"%s\"!\n", *filename);
+    }
+  }
+}
+
 int main(void) {
   // Test config.
   {
+    __attribute__((cleanup(test_internal_cleanup_delete_temporary_file)))
     const char *test_config_filename = "/tmp/c_simple_http_test.config";
     __attribute__((cleanup(simple_archiver_helper_cleanup_FILE)))
     FILE *test_file = fopen(test_config_filename, "w");
@@ -211,6 +220,7 @@ int main(void) {
 
   // Test http_template.
   {
+    __attribute__((cleanup(test_internal_cleanup_delete_temporary_file)))
     const char *test_http_template_filename =
       "/tmp/c_simple_http_template_test.config";
     __attribute__((cleanup(simple_archiver_helper_cleanup_FILE)))
@@ -244,6 +254,7 @@ int main(void) {
     ASSERT_TRUE(strcmp(buf, "<h1>Test</h1>") == 0);
     simple_archiver_helper_cleanup_c_string(&buf);
 
+    __attribute__((cleanup(test_internal_cleanup_delete_temporary_file)))
     const char *test_http_template_filename2 =
       "/tmp/c_simple_http_template_test2.config";
     test_file = fopen(test_http_template_filename2, "w");
@@ -282,8 +293,10 @@ int main(void) {
       == 0);
     simple_archiver_helper_cleanup_c_string(&buf);
 
+    __attribute__((cleanup(test_internal_cleanup_delete_temporary_file)))
     const char *test_http_template_filename3 =
       "/tmp/c_simple_http_template_test3.config";
+    __attribute__((cleanup(test_internal_cleanup_delete_temporary_file)))
     const char *test_http_template_html_filename =
       "/tmp/c_simple_http_template_test.html";
     test_file = fopen(test_http_template_filename3, "w");
@@ -342,10 +355,13 @@ int main(void) {
       == 0);
     simple_archiver_helper_cleanup_c_string(&buf);
 
+    __attribute__((cleanup(test_internal_cleanup_delete_temporary_file)))
     const char *test_http_template_filename4 =
       "/tmp/c_simple_http_template_test4.config";
+    __attribute__((cleanup(test_internal_cleanup_delete_temporary_file)))
     const char *test_http_template_html_filename2 =
       "/tmp/c_simple_http_template_test2.html";
+    __attribute__((cleanup(test_internal_cleanup_delete_temporary_file)))
     const char *test_http_template_html_var_filename =
       "/tmp/c_simple_http_template_test_var.html";
     test_file = fopen(test_http_template_filename4, "w");
