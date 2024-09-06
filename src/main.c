@@ -48,8 +48,7 @@ int main(int argc, char **argv) {
     return 2;
   }
 
-  printf("listening on port: %u\n", args.port);
-  printf("config file is: %s\n", args.config_file);
+  printf("Config file is: %s\n", args.config_file);
 
   __attribute__((cleanup(c_simple_http_clean_up_parsed_config)))
   C_SIMPLE_HTTP_ParsedConfig parsed_config = c_simple_http_parse_config(
@@ -62,6 +61,20 @@ int main(int argc, char **argv) {
     create_tcp_socket(args.port);
   if (tcp_socket == -1) {
     return 1;
+  }
+
+  {
+    struct sockaddr_in6 ipv6_addr;
+    memset(&ipv6_addr, 0, sizeof(struct sockaddr_in6));
+    socklen_t size = sizeof(ipv6_addr);
+    int ret = getsockname(tcp_socket, (struct sockaddr*)&ipv6_addr, &size);
+    if (ret == 0) {
+      printf("Listening on port: %u\n", u16_be_swap(ipv6_addr.sin6_port));
+    } else {
+      fprintf(
+        stderr,
+        "WARNING Failed to get info on tcp socket to print port number!\n");
+    }
   }
 
   struct timespec sleep_time;
