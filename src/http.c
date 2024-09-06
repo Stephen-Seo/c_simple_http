@@ -146,6 +146,12 @@ char *c_simple_http_request_response(
       *out_response_code = C_SIMPLE_HTTP_Response_400_Bad_Request;
     }
     return NULL;
+  } else if (strcmp(request_proto, "HTTP/1.1") != 0) {
+    fprintf(stderr, "ERROR Only HTTP/1.1 protocol requests are allowed!\n");
+    if (out_response_code) {
+      *out_response_code = C_SIMPLE_HTTP_Response_400_Bad_Request;
+    }
+    return NULL;
   }
 
   size_t generated_size = 0;
