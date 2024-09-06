@@ -48,7 +48,7 @@ int main(int argc, char **argv) {
     return 2;
   }
 
-  printf("%u\n", args.port);
+  printf("listening on port: %u\n", args.port);
   printf("config file is: %s\n", args.config_file);
 
   __attribute__((cleanup(c_simple_http_clean_up_parsed_config)))
