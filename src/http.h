@@ -37,6 +37,12 @@ char *c_simple_http_request_response(
   size_t *out_size
 );
 
+/// Takes a PATH string and returns a "bare" path.
+/// This will simply omit the first instance of "?" or "#" and the rest of the
+/// string.
+/// Must be free'd if returns non-NULL.
+char *c_simple_http_strip_path(const char *path, size_t path_size);
+
 #endif
 
 // vim: ts=2 sts=2 sw=2

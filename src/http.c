@@ -116,10 +116,17 @@ char *c_simple_http_request_response(
   }
 
   size_t generated_size = 0;
+  char *stripped_path = c_simple_http_strip_path(
+    request_path, request_path_idx);
   char *generated_buf = c_simple_http_path_to_generated(
-    request_path,
+    stripped_path ? stripped_path : request_path,
     templates,
     &generated_size);
+
+  if (stripped_path) {
+    free(stripped_path);
+  }
+
   if (!generated_buf || generated_size == 0) {
     fprintf(stderr, "ERROR Unable to generate response html for path \"%s\"!\n",
       request_path);
@@ -130,6 +137,25 @@ char *c_simple_http_request_response(
     *out_size = generated_size;
   }
   return generated_buf;
+}
+
+char *c_simple_http_strip_path(const char *path, size_t path_size) {
+  size_t idx = 0;
+  for (; idx < path_size && path[idx] != 0; ++idx) {
+    if (path[idx] == '?' || path[idx] == '#') {
+      break;
+    }
+  }
+
+  if (idx >= path_size || path[idx] == 0) {
+    return NULL;
+  }
+
+  char *stripped_path = malloc(idx + 1);
+  memcpy(stripped_path, path, idx);
+  stripped_path[idx] = 0;
+
+  return stripped_path;
 }
 
 // vim: ts=2 sts=2 sw=2
