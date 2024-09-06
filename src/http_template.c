@@ -86,7 +86,7 @@ int c_simple_http_internal_ends_with_FILE(const char *c_string) {
 
   const size_t c_string_size = strlen(c_string);
 
-  if (strcmp(
+  if (c_string_size >= 5 && strcmp(
       comparison_string,
       c_string + (c_string_size - strlen(comparison_string)))
         == 0) {
