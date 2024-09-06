@@ -39,6 +39,11 @@
 #include "constants.h"
 #include "http.h"
 
+typedef struct C_SIMPLE_HTTP_INTERNAL_Header_Check_Ctx {
+  const unsigned char *recv_buf;
+  ssize_t recv_buf_size;
+} C_SIMPLE_HTTP_INTERNAL_Header_Check_Ctx;
+
 #define CHECK_ERROR_WRITE(write_expr) \
   if (write_expr < 0) { \
     close(connection_fd); \
@@ -46,8 +51,24 @@
     continue; \
   }
 
+int c_simple_http_headers_check_print(void *data, void *ud) {
+  C_SIMPLE_HTTP_INTERNAL_Header_Check_Ctx *ctx = ud;
+  const char *header_c_str = data;
+
+  __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
+  char *matching_line = c_simple_http_filter_request_header(
+    (const char*)ctx->recv_buf,
+    (size_t)ctx->recv_buf_size,
+    header_c_str);
+  if (matching_line) {
+    printf("Printing header line: %s\n", matching_line);
+  }
+  return 0;
+}
+
 int main(int argc, char **argv) {
-  const Args args = parse_args(argc, argv);
+  __attribute__((cleanup(c_simple_http_free_args)))
+  Args args = parse_args(argc, argv);
 
   if (!args.config_file) {
     fprintf(stderr, "ERROR Config file not specified!\n");
@@ -131,8 +152,8 @@ int main(int argc, char **argv) {
           "WARNING Failed to read from new connection, closing...\n");
         continue;
       }
-      // DEBUG print received buf.
 #ifndef NDEBUG
+      // DEBUG print received buf.
       for (unsigned int idx = 0;
           idx < C_SIMPLE_HTTP_RECV_BUF_SIZE && idx < read_ret;
           ++idx) {
@@ -145,6 +166,15 @@ int main(int argc, char **argv) {
       }
       puts("");
 #endif
+      {
+        C_SIMPLE_HTTP_INTERNAL_Header_Check_Ctx ctx;
+        ctx.recv_buf = recv_buf;
+        ctx.recv_buf_size = read_ret;
+        simple_archiver_list_get(
+          args.list_of_headers_to_log,
+          c_simple_http_headers_check_print,
+          &ctx);
+      }
 
       size_t response_size = 0;
       enum C_SIMPLE_HTTP_ResponseCode response_code;

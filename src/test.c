@@ -6,6 +6,7 @@
 // Local includes.
 #include "config.h"
 #include "http_template.h"
+#include "http.h"
 
 // Third party includes.
 #include <SimpleArchiver/src/helpers.h>
@@ -442,6 +443,25 @@ int main(void) {
       == 0);
     CHECK_TRUE(output_buf_size == 43);
     simple_archiver_helper_cleanup_c_string(&buf);
+  }
+
+  // Test http.
+  {
+    const char *request =
+      "GET /path HTTP/1.1\nA-Header: Something\nAnother-Header: Other\n"
+      "Different-Header: Different\n";
+    size_t request_size = 92;
+
+    __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
+    char *header_line_buf = c_simple_http_filter_request_header(
+      request, request_size, "Another-Header");
+    ASSERT_TRUE(header_line_buf);
+    ASSERT_STREQ(header_line_buf, "Another-Header: Other");
+
+    simple_archiver_helper_cleanup_c_string(&header_line_buf);
+    header_line_buf = c_simple_http_filter_request_header(
+      request, request_size, "Non-Existant-Header");
+    ASSERT_FALSE(header_line_buf);
   }
 
   RETURN()

@@ -26,14 +26,18 @@ void print_usage(void) {
   puts("  -p <port> | --port <port>");
   puts("  --config=<config_file>");
   puts("  --disable-peer-addr-print");
+  puts("  --req-header-to-print=<header> (can be used multiple times)");
+  puts("    For example: --req-header-to-print=User-Agent");
 }
 
 Args parse_args(int argc, char **argv) {
   --argc;
   ++argv;
 
+  __attribute__((cleanup(c_simple_http_free_args)))
   Args args;
   memset(&args, 0, sizeof(Args));
+  args.list_of_headers_to_log = simple_archiver_list_init();
 
   while (argc > 0) {
     if ((strcmp(argv[0], "-p") == 0 || strcmp(argv[0], "--port") == 0)
@@ -48,6 +52,19 @@ Args parse_args(int argc, char **argv) {
       args.config_file = argv[0] + 9;
     } else if (strcmp(argv[0], "--disable-peer-addr-print") == 0) {
       args.flags |= 1;
+    } else if (strncmp(argv[0], "--req-header-to-print=", 22) == 0
+        && strlen(argv[0]) > 22) {
+      size_t arg_size = strlen(argv[0]) + 1 - 22;
+      char *header_buf = malloc(arg_size);
+      memcpy(header_buf, argv[0] + 22, arg_size);
+      if (simple_archiver_list_add(
+            args.list_of_headers_to_log, header_buf, NULL)
+          != 0) {
+        fprintf(
+          stderr, "ERROR Failed to parse \"--req-header-to-print=...\" !\n");
+        free(header_buf);
+        exit(1);
+      }
     } else {
       puts("ERROR: Invalid args!\n");
       print_usage();
@@ -58,7 +75,18 @@ Args parse_args(int argc, char **argv) {
     ++argv;
   }
 
-  return args;
+  // Prevent freeing of Args due to successful parsing.
+  Args to_return = args;
+  args.list_of_headers_to_log = NULL;
+  return to_return;
+}
+
+void c_simple_http_free_args(Args *args) {
+  if (args) {
+    if (args->list_of_headers_to_log) {
+      simple_archiver_list_free(&args->list_of_headers_to_log);
+    }
+  }
 }
 
 // vim: ts=2 sts=2 sw=2

@@ -17,6 +17,9 @@
 #ifndef SEODISPARATE_COM_C_SIMPLE_HTTP_ARG_PARSE_H_
 #define SEODISPARATE_COM_C_SIMPLE_HTTP_ARG_PARSE_H_
 
+// Third party includes.
+#include <SimpleArchiver/src/data_structures/linked_list.h>
+
 typedef struct Args {
   // xxxx xxx0 - enable peer addr print.
   // xxxx xxx1 - disable peer addr print.
@@ -24,11 +27,15 @@ typedef struct Args {
   unsigned short port;
   // Does not need to be free'd, this should point to a string in argv.
   const char *config_file;
+  // Needs to be free'd.
+  SDArchiverLinkedList *list_of_headers_to_log;
 } Args;
 
 void print_usage(void);
 
 Args parse_args(int argc, char **argv);
+
+void c_simple_http_free_args(Args *args);
 
 #endif
 

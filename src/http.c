@@ -209,4 +209,75 @@ char *c_simple_http_strip_path(const char *path, size_t path_size) {
   return stripped_path;
 }
 
+char *c_simple_http_filter_request_header(
+    const char *request, size_t request_size, const char *header) {
+  if (!request) {
+    fprintf(stderr, "ERROR filter_request_header: request is NULL!\n");
+    return NULL;
+  } else if (request_size == 0) {
+    fprintf(stderr, "ERROR filter_request_header: request_size is zero!\n");
+    return NULL;
+  } else if (!header) {
+    fprintf(stderr, "ERROR filter_request_header: header is NULL!\n");
+    return NULL;
+  }
+
+  // xxxx xxx0 - Start of line.
+  // xxxx xxx1 - In middle of line.
+  // xxxx xx0x - Header NOT found.
+  // xxxx xx1x - Header was found.
+  unsigned int flags = 0;
+  size_t idx = 0;
+  size_t line_start_idx = 0;
+  size_t header_idx = 0;
+  for(; idx < request_size && request[idx] != 0; ++idx) {
+    if ((flags & 1) == 0) {
+      if (request[idx] == '\n') {
+        continue;
+      }
+      line_start_idx = idx;
+      flags |= 1;
+      if (request[idx] == header[header_idx]) {
+        ++header_idx;
+        if (header[header_idx] == 0) {
+          flags |= 2;
+          break;
+        }
+      } else {
+        header_idx = 0;
+      }
+    } else {
+      if (header_idx != 0) {
+        if (request[idx] == header[header_idx]) {
+          ++header_idx;
+          if (header[header_idx] == 0) {
+            flags |= 2;
+            break;
+          }
+        } else {
+          header_idx = 0;
+        }
+      }
+
+      if (request[idx] == '\n') {
+        flags &= 0xFFFFFFFE;
+      }
+    }
+  }
+
+  if ((flags & 2) != 0) {
+    // Get line end starting from line_start_idx.
+    for (
+      idx = line_start_idx;
+      idx < request_size && request[idx] != 0 && request[idx] != '\n';
+      ++idx);
+    char *line_buf = malloc(idx - line_start_idx + 1);
+    memcpy(line_buf, request + line_start_idx, idx - line_start_idx);
+    line_buf[idx - line_start_idx] = 0;
+    return line_buf;
+  }
+
+  return NULL;
+}
+
 // vim: ts=2 sts=2 sw=2
