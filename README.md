@@ -8,6 +8,14 @@ A simple HTTP/1.1 server written in C.
       -p <port> | --port <port>
       --config=<config_file>
 
+## Before Compiling
+
+Make sure that the git submodule(s) are loaded:
+
+    git submodule update --init --recursive --depth=1 --no-single-branch
+
+Without this, the project will fail to build.
+
 ## Example
 
     # Build the project.
