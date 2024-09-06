@@ -32,11 +32,32 @@
 #define REQUEST_PATH_BUFFER_SIZE 256
 #define REQUEST_PROTO_BUFFER_SIZE 16
 
+const char *c_simple_http_response_code_error_to_response(
+    enum C_SIMPLE_HTTP_ResponseCode response_code) {
+  switch (response_code) {
+    case C_SIMPLE_HTTP_Response_400_Bad_Request:
+      return "HTTP/1.1 400 Bad Request\nAllow: GET\nContent-Type: text/html\n"
+             "Content-Length: 25\n\n"
+             "<h1>400 Bad Request</h1>\n";
+    case C_SIMPLE_HTTP_Response_404_Not_Found:
+      return "HTTP/1.1 404 Not Found\nAllow: GET\nContent-Type: text/html\n"
+             "Content-Length: 23\n\n"
+             "<h1>404 Not Found</h1>\n";
+    case C_SIMPLE_HTTP_Response_500_Internal_Server_Error:
+    default:
+      return "HTTP/1.1 500 Internal Server Error\nAllow: GET\n"
+             "Content-Type: text/html\n"
+             "Content-Length: 35\n\n"
+             "<h1>500 Internal Server Error</h1>\n";
+  }
+}
+
 char *c_simple_http_request_response(
     const char *request,
     unsigned int size,
     const C_SIMPLE_HTTP_HTTPTemplates *templates,
-    size_t *out_size) {
+    size_t *out_size,
+    enum C_SIMPLE_HTTP_ResponseCode *out_response_code) {
   if (out_size) {
     *out_size = 0;
   }
@@ -54,6 +75,9 @@ char *c_simple_http_request_response(
     request_type[request_type_idx++] = request[idx];
   }
   if (request_type_idx == 0) {
+    if (out_response_code) {
+      *out_response_code = C_SIMPLE_HTTP_Response_400_Bad_Request;
+    }
     return NULL;
   }
 #ifndef NDEBUG
@@ -79,6 +103,9 @@ char *c_simple_http_request_response(
     request_path[request_path_idx++] = request[idx];
   }
   if (request_path_idx == 0) {
+    if (out_response_code) {
+      *out_response_code = C_SIMPLE_HTTP_Response_400_Bad_Request;
+    }
     return NULL;
   }
 #ifndef NDEBUG
@@ -104,6 +131,9 @@ char *c_simple_http_request_response(
     request_proto[request_proto_idx++] = request[idx];
   }
   if (request_proto_idx == 0) {
+    if (out_response_code) {
+      *out_response_code = C_SIMPLE_HTTP_Response_400_Bad_Request;
+    }
     return NULL;
   }
 #ifndef NDEBUG
@@ -112,10 +142,14 @@ char *c_simple_http_request_response(
 
   if (strcmp(request_type, "GET") != 0) {
     fprintf(stderr, "ERROR Only GET requests are allowed!\n");
+    if (out_response_code) {
+      *out_response_code = C_SIMPLE_HTTP_Response_400_Bad_Request;
+    }
     return NULL;
   }
 
   size_t generated_size = 0;
+  __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
   char *stripped_path = c_simple_http_strip_path(
     request_path, request_path_idx);
   char *generated_buf = c_simple_http_path_to_generated(
@@ -123,18 +157,29 @@ char *c_simple_http_request_response(
     templates,
     &generated_size);
 
-  if (stripped_path) {
-    free(stripped_path);
-  }
-
   if (!generated_buf || generated_size == 0) {
     fprintf(stderr, "ERROR Unable to generate response html for path \"%s\"!\n",
       request_path);
+    if (out_response_code) {
+      if (
+          simple_archiver_hash_map_get(
+            templates->hash_map,
+            stripped_path ? stripped_path : request_path,
+            stripped_path ? strlen(stripped_path) + 1 : request_path_idx + 1)
+          == NULL) {
+        *out_response_code = C_SIMPLE_HTTP_Response_404_Not_Found;
+      } else {
+        *out_response_code = C_SIMPLE_HTTP_Response_500_Internal_Server_Error;
+      }
+    }
     return NULL;
   }
 
   if (out_size) {
     *out_size = generated_size;
+  }
+  if (out_response_code) {
+    *out_response_code = C_SIMPLE_HTTP_Response_200_OK;
   }
   return generated_buf;
 }

@@ -28,13 +28,26 @@
 
 typedef C_SIMPLE_HTTP_ParsedConfig C_SIMPLE_HTTP_HTTPTemplates;
 
+enum C_SIMPLE_HTTP_ResponseCode {
+  C_SIMPLE_HTTP_Response_200_OK,
+  C_SIMPLE_HTTP_Response_400_Bad_Request,
+  C_SIMPLE_HTTP_Response_404_Not_Found,
+  C_SIMPLE_HTTP_Response_500_Internal_Server_Error,
+};
+
+// If the response code is an error, returns a full response string that doesn't
+// need to be free'd. Otherwise, returns as if error 500.
+const char *c_simple_http_response_code_error_to_response(
+  enum C_SIMPLE_HTTP_ResponseCode response_code);
+
 /// Returned buffer must be "free"d after use.
 /// If the request is not valid, or 404, then the buffer will be NULL.
 char *c_simple_http_request_response(
   const char *request,
   unsigned int size,
   const C_SIMPLE_HTTP_HTTPTemplates *templates,
-  size_t *out_size
+  size_t *out_size,
+  enum C_SIMPLE_HTTP_ResponseCode *out_response_code
 );
 
 /// Takes a PATH string and returns a "bare" path.

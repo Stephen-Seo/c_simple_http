@@ -141,12 +141,18 @@ int main(int argc, char **argv) {
       puts("");
 
       size_t response_size = 0;
+      enum C_SIMPLE_HTTP_ResponseCode response_code;
       const char *response = c_simple_http_request_response(
-        (const char*)recv_buf, (unsigned int)read_ret, &parsed_config, &response_size);
-      if (response) {
+        (const char*)recv_buf,
+        (unsigned int)read_ret,
+        &parsed_config,
+        &response_size,
+        &response_code);
+      if (response && response_code == C_SIMPLE_HTTP_Response_200_OK) {
         CHECK_ERROR_WRITE(write(connection_fd, "HTTP/1.1 200 OK\n", 16));
         CHECK_ERROR_WRITE(write(connection_fd, "Allow: GET\n", 11));
-        CHECK_ERROR_WRITE(write(connection_fd, "Content-Type: text/html\n", 24));
+        CHECK_ERROR_WRITE(write(
+          connection_fd, "Content-Type: text/html\n", 24));
         char content_length_buf[128];
         size_t content_length_buf_size = 0;
         memcpy(content_length_buf, "Content-Length: ", 16);
@@ -166,18 +172,28 @@ int main(int argc, char **argv) {
           continue;
         }
         content_length_buf_size += (size_t)written;
-        CHECK_ERROR_WRITE(write(connection_fd, content_length_buf, content_length_buf_size));
+        CHECK_ERROR_WRITE(write(
+          connection_fd, content_length_buf, content_length_buf_size));
         CHECK_ERROR_WRITE(write(connection_fd, "\n", 1));
         CHECK_ERROR_WRITE(write(connection_fd, response, response_size));
 
         free((void*)response);
       } else {
-        // TODO handle internal errors also.
-        CHECK_ERROR_WRITE(write(connection_fd, "HTTP/1.1 404 Not Found\n", 23));
-        CHECK_ERROR_WRITE(write(connection_fd, "Allow: GET\n", 11));
-        CHECK_ERROR_WRITE(write(connection_fd, "Content-Type: text/html\n", 24));
-        CHECK_ERROR_WRITE(write(connection_fd, "Content-Length: 14\n", 19));
-        CHECK_ERROR_WRITE(write(connection_fd, "\n404 Not Found\n", 15));
+        const char *response = c_simple_http_response_code_error_to_response(
+          response_code);
+        size_t response_size = strlen(response);
+        if (response) {
+          CHECK_ERROR_WRITE(write(connection_fd, response, response_size));
+        } else {
+          CHECK_ERROR_WRITE(write(
+            connection_fd, "HTTP/1.1 404 Not Found\n", 23));
+          CHECK_ERROR_WRITE(write(connection_fd, "Allow: GET\n", 11));
+          CHECK_ERROR_WRITE(write(
+            connection_fd, "Content-Type: text/html\n", 24));
+          CHECK_ERROR_WRITE(write(connection_fd, "Content-Length: 35\n", 19));
+          CHECK_ERROR_WRITE(write(
+            connection_fd, "\n<h1>500 Internal Server Error</h1>\n", 36));
+        }
       }
       close(connection_fd);
     } else {
