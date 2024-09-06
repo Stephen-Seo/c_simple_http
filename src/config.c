@@ -237,10 +237,11 @@ typedef struct C_SIMPLE_HTTP_INTERNAL_RequiredIter {
 
 int c_simple_http_required_iter_fn(void *data, void *ud) {
   C_SIMPLE_HTTP_INTERNAL_RequiredIter *req_iter_struct = ud;
+  unsigned int data_str_length = (unsigned int)strlen(data) + 1;
   if (simple_archiver_hash_map_get(
       req_iter_struct->hash_map,
       data,
-      strlen(data) + 1) == NULL) {
+      data_str_length) == NULL) {
     if (req_iter_struct->path) {
       fprintf(
         stderr,
@@ -266,11 +267,12 @@ typedef struct C_SIMPLE_HTTP_INTERNAL_RequiredCheck {
 
 int c_simple_http_check_required_iter_fn(void *path_void_str, void *ud) {
   C_SIMPLE_HTTP_INTERNAL_RequiredCheck *req = ud;
+  unsigned int path_void_str_len = (unsigned int)strlen(path_void_str) + 1;
   C_SIMPLE_HTTP_HashMapWrapper *wrapper =
     simple_archiver_hash_map_get(
       req->map_of_paths_and_their_vars,
       path_void_str,
-      strlen(path_void_str) + 1);
+      path_void_str_len);
   if (!wrapper) {
     fprintf(stderr,
             "WARNING: Map of paths does not have path \"%s\"!\n",
@@ -301,7 +303,8 @@ C_SIMPLE_HTTP_ParsedConfig c_simple_http_parse_config(
     fprintf(stderr, "ERROR: separating_key argument is NULL!\n");
     return config;
   }
-  const unsigned int separating_key_size = strlen(separating_key) + 1;
+  const unsigned int separating_key_size =
+    (unsigned int)strlen(separating_key) + 1;
 
   config.hash_map = simple_archiver_hash_map_init();
 
@@ -384,7 +387,7 @@ C_SIMPLE_HTTP_ParsedConfig c_simple_http_parse_config(
     }
     if ((state & 1) == 0) {
       if (c != '=') {
-        key_buf[key_idx++] = c;
+        key_buf[key_idx++] = (unsigned char)c;
         if (key_idx >= C_SIMPLE_HTTP_CONFIG_BUF_SIZE) {
           fprintf(stderr,
                   "ERROR: config file \"key\" is larger than %u bytes!\n",
@@ -408,7 +411,7 @@ C_SIMPLE_HTTP_ParsedConfig c_simple_http_parse_config(
       }
     } else if ((state & 1) == 1) {
       if ((c != '\n' && c != '\r') || (state & 0xC) != 0) {
-        value_buf[value_idx++] = c;
+        value_buf[value_idx++] = (unsigned char)c;
         if (value_idx >= C_SIMPLE_HTTP_CONFIG_BUF_SIZE) {
           fprintf(stderr,
                   "ERROR: config file \"value\" is larger than %u bytes!\n",

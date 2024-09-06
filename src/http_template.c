@@ -103,8 +103,14 @@ char *c_simple_http_path_to_generated(
   if (output_buf_size) {
     *output_buf_size = 0;
   }
+  size_t path_len_size_t = strlen(path) + 1;
+  if (path_len_size_t > 0xFFFFFFFF) {
+    fprintf(stderr, "ERROR: Path string is too large!\n");
+    return NULL;
+  }
+  unsigned int path_len = (unsigned int)path_len_size_t;
   C_SIMPLE_HTTP_ParsedConfig *wrapped_hash_map =
-    simple_archiver_hash_map_get(templates->hash_map, path, strlen(path) + 1);
+    simple_archiver_hash_map_get(templates->hash_map, path, path_len);
   if (!wrapped_hash_map) {
     return NULL;
   }
@@ -129,13 +135,13 @@ char *c_simple_http_path_to_generated(
     if (fseek(f, 0, SEEK_SET) != 0) {
       return NULL;
     }
-    html_buf = malloc(html_file_size + 1);
-    size_t ret = fread(html_buf, 1, html_file_size, f);
+    html_buf = malloc((size_t)html_file_size + 1);
+    size_t ret = fread(html_buf, 1, (size_t)html_file_size, f);
     if (ret != (size_t)html_file_size) {
       return NULL;
     }
     html_buf[html_file_size] = 0;
-    html_buf_size = html_file_size;
+    html_buf_size = (size_t)html_file_size;
   } else {
     char *stored_html =
       simple_archiver_hash_map_get(wrapped_hash_map->hash_map, "HTML", 5);
@@ -215,7 +221,7 @@ char *c_simple_http_path_to_generated(
             simple_archiver_hash_map_get(
               wrapped_hash_map->hash_map,
               var,
-              var_size + 1);
+              (unsigned int)var_size + 1);
           if (value_c_str) {
             if (c_simple_http_internal_ends_with_FILE(var) == 0) {
               // Load from file specified by "value_c_str".

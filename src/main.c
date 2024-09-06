@@ -39,6 +39,13 @@
 #include "constants.h"
 #include "http.h"
 
+#define CHECK_ERROR_WRITE(write_expr) \
+  if (write_expr < 0) { \
+    close(connection_fd); \
+    fprintf(stderr, "ERROR Failed to write to connected peer, closing...\n"); \
+    continue; \
+  }
+
 int main(int argc, char **argv) {
   Args args = parse_args(argc, argv);
 
@@ -113,6 +120,13 @@ int main(int argc, char **argv) {
       puts("");
       int connection_fd = ret;
       read_ret = read(connection_fd, recv_buf, C_SIMPLE_HTTP_RECV_BUF_SIZE);
+      if (read_ret < 0) {
+        close(connection_fd);
+        fprintf(
+          stderr,
+          "WARNING Failed to read from new connection, closing...\n");
+        continue;
+      }
       // DEBUG print received buf.
       for (unsigned int idx = 0;
           idx < C_SIMPLE_HTTP_RECV_BUF_SIZE && idx < read_ret;
@@ -128,11 +142,11 @@ int main(int argc, char **argv) {
 
       size_t response_size = 0;
       const char *response = c_simple_http_request_response(
-        (const char*)recv_buf, read_ret, &parsed_config, &response_size);
+        (const char*)recv_buf, (unsigned int)read_ret, &parsed_config, &response_size);
       if (response) {
-        write(connection_fd, "HTTP/1.1 200 OK\n", 16);
-        write(connection_fd, "Allow: GET\n", 11);
-        write(connection_fd, "Content-Type: text/html\n", 24);
+        CHECK_ERROR_WRITE(write(connection_fd, "HTTP/1.1 200 OK\n", 16));
+        CHECK_ERROR_WRITE(write(connection_fd, "Allow: GET\n", 11));
+        CHECK_ERROR_WRITE(write(connection_fd, "Content-Type: text/html\n", 24));
         char content_length_buf[128];
         size_t content_length_buf_size = 0;
         memcpy(content_length_buf, "Content-Length: ", 16);
@@ -144,19 +158,26 @@ int main(int argc, char **argv) {
           "%lu\n%n",
           response_size,
           &written);
-        content_length_buf_size += written;
-        write(connection_fd, content_length_buf, content_length_buf_size);
-        write(connection_fd, "\n", 1);
-        write(connection_fd, response, response_size);
+        if (written <= 0) {
+          close(connection_fd);
+          fprintf(
+            stderr,
+            "WARNING Failed to write in response, closing connection...\n");
+          continue;
+        }
+        content_length_buf_size += (size_t)written;
+        CHECK_ERROR_WRITE(write(connection_fd, content_length_buf, content_length_buf_size));
+        CHECK_ERROR_WRITE(write(connection_fd, "\n", 1));
+        CHECK_ERROR_WRITE(write(connection_fd, response, response_size));
 
         free((void*)response);
       } else {
         // TODO handle internal errors also.
-        write(connection_fd, "HTTP/1.1 404 Not Found\n", 23);
-        write(connection_fd, "Allow: GET\n", 11);
-        write(connection_fd, "Content-Type: text/html\n", 24);
-        write(connection_fd, "Content-Length: 14\n", 19);
-        write(connection_fd, "\n404 Not Found\n", 15);
+        CHECK_ERROR_WRITE(write(connection_fd, "HTTP/1.1 404 Not Found\n", 23));
+        CHECK_ERROR_WRITE(write(connection_fd, "Allow: GET\n", 11));
+        CHECK_ERROR_WRITE(write(connection_fd, "Content-Type: text/html\n", 24));
+        CHECK_ERROR_WRITE(write(connection_fd, "Content-Length: 14\n", 19));
+        CHECK_ERROR_WRITE(write(connection_fd, "\n404 Not Found\n", 15));
       }
       close(connection_fd);
     } else {
