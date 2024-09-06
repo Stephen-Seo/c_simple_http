@@ -128,6 +128,7 @@ int main(int argc, char **argv) {
         continue;
       }
       // DEBUG print received buf.
+#ifndef NDEBUG
       for (unsigned int idx = 0;
           idx < C_SIMPLE_HTTP_RECV_BUF_SIZE && idx < read_ret;
           ++idx) {
@@ -139,6 +140,7 @@ int main(int argc, char **argv) {
         }
       }
       puts("");
+#endif
 
       size_t response_size = 0;
       enum C_SIMPLE_HTTP_ResponseCode response_code;
