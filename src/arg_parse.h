@@ -18,6 +18,8 @@
 #define SEODISPARATE_COM_C_SIMPLE_HTTP_ARG_PARSE_H_
 
 typedef struct Args {
+  // xxxx xxx0 - enable peer addr print.
+  // xxxx xxx1 - disable peer addr print.
   unsigned short flags;
   unsigned short port;
   // Does not need to be free'd, this should point to a string in argv.

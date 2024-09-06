@@ -7,6 +7,7 @@ A simple HTTP/1.1 server written in C.
     Usage:
       -p <port> | --port <port>
       --config=<config_file>
+      --disable-peer-addr-print
 
 ## Before Compiling
 

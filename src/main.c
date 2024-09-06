@@ -47,7 +47,7 @@
   }
 
 int main(int argc, char **argv) {
-  Args args = parse_args(argc, argv);
+  const Args args = parse_args(argc, argv);
 
   if (!args.config_file) {
     fprintf(stderr, "ERROR Config file not specified!\n");
@@ -110,14 +110,18 @@ int main(int argc, char **argv) {
       printf("WARNING: accept: errno %d\n", errno);
     } else if (ret >= 0) {
       // Received connection, handle it.
-      printf("Peer connected: addr is ");
-      for (unsigned int idx = 0; idx < 16; ++idx) {
-        if (idx % 2 == 0 && idx > 0) {
-          printf(":");
+      if ((args.flags & 1) == 0) {
+        printf("Peer connected: addr is ");
+        for (unsigned int idx = 0; idx < 16; ++idx) {
+          if (idx % 2 == 0 && idx > 0) {
+            printf(":");
+          }
+          printf("%02x", peer_info.sin6_addr.s6_addr[idx]);
         }
-        printf("%02x", peer_info.sin6_addr.s6_addr[idx]);
+        puts("");
+      } else {
+        printf("Peer connected.\n");
       }
-      puts("");
       int connection_fd = ret;
       read_ret = read(connection_fd, recv_buf, C_SIMPLE_HTTP_RECV_BUF_SIZE);
       if (read_ret < 0) {
