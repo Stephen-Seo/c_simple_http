@@ -21,8 +21,15 @@ Without this, the project will fail to build.
     # Build the project.
     make c_simple_http
     
+    # Alternatively, build with cmake.
+    cmake -S . -B buildDebug && make -C buildDebug
+    
     # Run it with the example config.
+    # Note that the example config was designed such that it must be referred
+    # to from its parent directory.
     ./c_simple_http --config=example_config/example.config
+    # If built with cmake:
+    ./buildDebug/c_simple_http --config=example_config/example.config
     
     # If port is not specified, the server picks a random port.
     # This program should print which TCP port it is listening on.
