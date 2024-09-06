@@ -21,8 +21,12 @@
 #include <string.h>
 #include <stdio.h>
 
+// Third party includes.
+#include <SimpleArchiver/src/helpers.h>
+
 // Local includes
 #include "constants.h"
+#include "http_template.h"
 
 #define REQUEST_TYPE_BUFFER_SIZE 16
 #define REQUEST_PATH_BUFFER_SIZE 256
@@ -31,7 +35,11 @@
 char *c_simple_http_request_response(
     const char *request,
     unsigned int size,
-    const C_SIMPLE_HTTP_HTTPTemplates *templates) {
+    const C_SIMPLE_HTTP_HTTPTemplates *templates,
+    size_t *out_size) {
+  if (out_size) {
+    *out_size = 0;
+  }
   // parse first line.
   unsigned int idx = 0;
   char request_type[REQUEST_TYPE_BUFFER_SIZE] = {0};
@@ -102,8 +110,26 @@ char *c_simple_http_request_response(
   fprintf(stderr, "Parsing request: got http protocol \"%s\"\n", request_proto);
 #endif
 
-  // TODO
-  return NULL;
+  if (strcmp(request_type, "GET") != 0) {
+    fprintf(stderr, "ERROR Only GET requests are allowed!\n");
+    return NULL;
+  }
+
+  size_t generated_size = 0;
+  char *generated_buf = c_simple_http_path_to_generated(
+    request_path,
+    templates,
+    &generated_size);
+  if (!generated_buf || generated_size == 0) {
+    fprintf(stderr, "ERROR Unable to generate response html for path \"%s\"!\n",
+      request_path);
+    return NULL;
+  }
+
+  if (out_size) {
+    *out_size = generated_size;
+  }
+  return generated_buf;
 }
 
 // vim: ts=2 sts=2 sw=2

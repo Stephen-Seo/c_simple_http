@@ -20,6 +20,8 @@
 typedef struct Args {
   unsigned short flags;
   unsigned short port;
+  // Does not need to be free'd, this should point to a string in argv.
+  const char *config_file;
 } Args;
 
 void print_usage(void);

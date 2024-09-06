@@ -17,6 +17,9 @@
 #ifndef SEODISPARATE_COM_C_SIMPLE_HTTP_HTTP_H_
 #define SEODISPARATE_COM_C_SIMPLE_HTTP_HTTP_H_
 
+// Standard library includes.
+#include <stddef.h>
+
 // Third party includes.
 #include <SimpleArchiver/src/data_structures/hash_map.h>
 
@@ -30,7 +33,8 @@ typedef C_SIMPLE_HTTP_ParsedConfig C_SIMPLE_HTTP_HTTPTemplates;
 char *c_simple_http_request_response(
   const char *request,
   unsigned int size,
-  const C_SIMPLE_HTTP_HTTPTemplates *templates
+  const C_SIMPLE_HTTP_HTTPTemplates *templates,
+  size_t *out_size
 );
 
 #endif

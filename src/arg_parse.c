@@ -24,6 +24,7 @@
 void print_usage(void) {
   puts("Usage:");
   puts("  -p <port> | --port <port>");
+  puts("  --config=<config_file>");
 }
 
 Args parse_args(int argc, char **argv) {
@@ -42,6 +43,8 @@ Args parse_args(int argc, char **argv) {
       }
       --argc;
       ++argv;
+    } else if (strncmp(argv[0], "--config=", 9) == 0 && strlen(argv[0]) > 9) {
+      args.config_file = argv[0] + 9;
     } else {
       puts("ERROR: Invalid args!\n");
       print_usage();

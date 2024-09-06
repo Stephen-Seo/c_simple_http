@@ -27,6 +27,9 @@
 #include <time.h>
 #include <errno.h>
 
+// Third party includes.
+#include <SimpleArchiver/src/helpers.h>
+
 // Local includes.
 #include "arg_parse.h"
 #include "big_endian.h"
@@ -39,7 +42,21 @@
 int main(int argc, char **argv) {
   Args args = parse_args(argc, argv);
 
+  if (!args.config_file) {
+    fprintf(stderr, "ERROR Config file not specified!\n");
+    print_usage();
+    return 2;
+  }
+
   printf("%u\n", args.port);
+  printf("config file is: %s\n", args.config_file);
+
+  __attribute__((cleanup(c_simple_http_clean_up_parsed_config)))
+  C_SIMPLE_HTTP_ParsedConfig parsed_config = c_simple_http_parse_config(
+    args.config_file,
+    "PATH",
+    NULL
+  );
 
   __attribute__((cleanup(cleanup_tcp_socket))) int tcp_socket =
     create_tcp_socket(args.port);
@@ -95,12 +112,38 @@ int main(int argc, char **argv) {
         }
       }
       puts("");
-      // TODO Validate request and send response.
-      // TODO WIP
+
+      size_t response_size = 0;
       const char *response = c_simple_http_request_response(
-        (const char*)recv_buf, read_ret, NULL);
+        (const char*)recv_buf, read_ret, &parsed_config, &response_size);
       if (response) {
+        write(connection_fd, "HTTP/1.1 200 OK\n", 16);
+        write(connection_fd, "Allow: GET\n", 11);
+        write(connection_fd, "Content-Type: text/html\n", 24);
+        char content_length_buf[128];
+        size_t content_length_buf_size = 0;
+        memcpy(content_length_buf, "Content-Length: ", 16);
+        content_length_buf_size = 16;
+        int written = 0;
+        snprintf(
+          content_length_buf + content_length_buf_size,
+          127 - content_length_buf_size,
+          "%lu\n%n",
+          response_size,
+          &written);
+        content_length_buf_size += written;
+        write(connection_fd, content_length_buf, content_length_buf_size);
+        write(connection_fd, "\n", 1);
+        write(connection_fd, response, response_size);
+
         free((void*)response);
+      } else {
+        // TODO handle internal errors also.
+        write(connection_fd, "HTTP/1.1 404 Not Found\n", 23);
+        write(connection_fd, "Allow: GET\n", 11);
+        write(connection_fd, "Content-Type: text/html\n", 24);
+        write(connection_fd, "Content-Length: 14\n", 19);
+        write(connection_fd, "\n404 Not Found\n", 15);
       }
       close(connection_fd);
     } else {
