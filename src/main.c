@@ -40,10 +40,6 @@
 #include "http.h"
 #include "helpers.h"
 
-typedef struct C_SIMPLE_HTTP_INTERNAL_Header_Check_Ctx {
-  SDArchiverHashMap *headers_map;
-} C_SIMPLE_HTTP_INTERNAL_Header_Check_Ctx;
-
 #define CHECK_ERROR_WRITE(write_expr) \
   if (write_expr < 0) { \
     close(connection_fd); \
@@ -52,14 +48,14 @@ typedef struct C_SIMPLE_HTTP_INTERNAL_Header_Check_Ctx {
   }
 
 int c_simple_http_headers_check_print(void *data, void *ud) {
-  C_SIMPLE_HTTP_INTERNAL_Header_Check_Ctx *ctx = ud;
+  SDArchiverHashMap *headers_map = ud;
   const char *header_c_str = data;
 
   __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
   char *header_c_str_lowercase = c_simple_http_helper_to_lowercase(
     header_c_str, strlen(header_c_str) + 1);
   char *matching_line = simple_archiver_hash_map_get(
-    ctx->headers_map,
+    headers_map,
     header_c_str_lowercase,
     strlen(header_c_str) + 1);
   if (matching_line) {
@@ -169,15 +165,14 @@ int main(int argc, char **argv) {
       puts("");
 #endif
       {
-        C_SIMPLE_HTTP_INTERNAL_Header_Check_Ctx ctx;
-        ctx.headers_map = c_simple_http_request_to_headers_map(
+        SDArchiverHashMap *headers_map = c_simple_http_request_to_headers_map(
           (const char*)recv_buf,
           (size_t)read_ret);
         simple_archiver_list_get(
           args.list_of_headers_to_log,
           c_simple_http_headers_check_print,
-          &ctx);
-        simple_archiver_hash_map_free(&ctx.headers_map);
+          headers_map);
+        simple_archiver_hash_map_free(&headers_map);
       }
 
       size_t response_size = 0;
@@ -249,4 +244,4 @@ int main(int argc, char **argv) {
   return 0;
 }
 
-// vim: ts=2 sts=2 sw=2
+// vim: et ts=2 sts=2 sw=2

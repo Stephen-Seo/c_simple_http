@@ -33,4 +33,4 @@ unsigned short u16_be_swap(unsigned short value) {
   }
 }
 
-// vim: ts=2 sts=2 sw=2
+// vim: et ts=2 sts=2 sw=2

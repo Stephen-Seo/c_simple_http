@@ -69,4 +69,4 @@ void c_simple_http_clean_up_parsed_config(C_SIMPLE_HTTP_ParsedConfig *config);
 
 #endif
 
-// vim: ts=2 sts=2 sw=2
+// vim: et ts=2 sts=2 sw=2

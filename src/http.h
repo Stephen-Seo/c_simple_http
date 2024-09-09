@@ -65,4 +65,4 @@ SDArchiverHashMap *c_simple_http_request_to_headers_map(
 
 #endif
 
-// vim: ts=2 sts=2 sw=2
+// vim: et ts=2 sts=2 sw=2

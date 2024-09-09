@@ -33,4 +33,4 @@ char *c_simple_http_path_to_generated(
 
 #endif
 
-// vim: ts=2 sts=2 sw=2
+// vim: et ts=2 sts=2 sw=2
