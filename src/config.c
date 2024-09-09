@@ -132,7 +132,7 @@
     strncpy((char*)key, separating_key, separating_key_size); \
     unsigned char *value = malloc(value_idx); \
     memcpy(value, value_buf, value_idx); \
-    if (simple_archiver_hash_map_insert(&hash_map, \
+    if (simple_archiver_hash_map_insert(hash_map, \
                                         value, \
                                         key, \
                                         separating_key_size, \
@@ -152,7 +152,7 @@
     wrapper->paths = hash_map; \
  \
     if (simple_archiver_hash_map_insert( \
-        &config.hash_map, \
+        config.hash_map, \
         wrapper, \
         value, \
         value_idx, \
@@ -196,7 +196,7 @@
     unsigned char *value = malloc(value_idx); \
     memcpy(value, value_buf, value_idx); \
  \
-    if (simple_archiver_hash_map_insert(&hash_map_wrapper->paths, \
+    if (simple_archiver_hash_map_insert(hash_map_wrapper->paths, \
                                         value, \
                                         key, \
                                         key_idx, \
