@@ -38,10 +38,10 @@
 #include "globals.h"
 #include "constants.h"
 #include "http.h"
+#include "helpers.h"
 
 typedef struct C_SIMPLE_HTTP_INTERNAL_Header_Check_Ctx {
-  const unsigned char *recv_buf;
-  ssize_t recv_buf_size;
+  SDArchiverHashMap *headers_map;
 } C_SIMPLE_HTTP_INTERNAL_Header_Check_Ctx;
 
 #define CHECK_ERROR_WRITE(write_expr) \
@@ -56,10 +56,12 @@ int c_simple_http_headers_check_print(void *data, void *ud) {
   const char *header_c_str = data;
 
   __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
-  char *matching_line = c_simple_http_filter_request_header(
-    (const char*)ctx->recv_buf,
-    (size_t)ctx->recv_buf_size,
-    header_c_str);
+  char *header_c_str_lowercase = c_simple_http_helper_to_lowercase(
+    header_c_str, strlen(header_c_str) + 1);
+  char *matching_line = simple_archiver_hash_map_get(
+    ctx->headers_map,
+    header_c_str_lowercase,
+    strlen(header_c_str) + 1);
   if (matching_line) {
     printf("Printing header line: %s\n", matching_line);
   }
@@ -168,12 +170,14 @@ int main(int argc, char **argv) {
 #endif
       {
         C_SIMPLE_HTTP_INTERNAL_Header_Check_Ctx ctx;
-        ctx.recv_buf = recv_buf;
-        ctx.recv_buf_size = read_ret;
+        ctx.headers_map = c_simple_http_request_to_headers_map(
+          (const char*)recv_buf,
+          (size_t)read_ret);
         simple_archiver_list_get(
           args.list_of_headers_to_log,
           c_simple_http_headers_check_print,
           &ctx);
+        simple_archiver_hash_map_free(&ctx.headers_map);
       }
 
       size_t response_size = 0;

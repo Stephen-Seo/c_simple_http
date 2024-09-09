@@ -8,6 +8,9 @@ A simple HTTP/1.1 server written in C.
       -p <port> | --port <port>
       --config=<config_file>
       --disable-peer-addr-print
+      --req-header-to-print=<header> (can be used multiple times)
+        For example: --req-header-to-print=User-Agent
+        Note that this option is case-insensitive
 
 ## Before Compiling
 

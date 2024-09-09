@@ -447,21 +447,19 @@ int main(void) {
 
   // Test http.
   {
-    const char *request =
-      "GET /path HTTP/1.1\nA-Header: Something\nAnother-Header: Other\n"
-      "Different-Header: Different\n";
-    size_t request_size = 92;
+    __attribute((cleanup(simple_archiver_hash_map_free)))
+    SDArchiverHashMap *headers_map = c_simple_http_request_to_headers_map(
+      "GET / HTTP/1.1\nUser-Agent: Blah\nHost: some host", 47);
+    ASSERT_TRUE(headers_map);
 
-    __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
-    char *header_line_buf = c_simple_http_filter_request_header(
-      request, request_size, "Another-Header");
-    ASSERT_TRUE(header_line_buf);
-    ASSERT_STREQ(header_line_buf, "Another-Header: Other");
+    const char *ret =
+      simple_archiver_hash_map_get(headers_map, "user-agent", 11);
+    ASSERT_TRUE(ret);
+    CHECK_STREQ(ret, "User-Agent: Blah");
 
-    simple_archiver_helper_cleanup_c_string(&header_line_buf);
-    header_line_buf = c_simple_http_filter_request_header(
-      request, request_size, "Non-Existant-Header");
-    ASSERT_FALSE(header_line_buf);
+    ret = simple_archiver_hash_map_get(headers_map, "host", 5);
+    ASSERT_TRUE(ret);
+    CHECK_STREQ(ret, "Host: some host");
   }
 
   RETURN()

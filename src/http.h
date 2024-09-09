@@ -56,10 +56,12 @@ char *c_simple_http_request_response(
 /// Must be free'd if returns non-NULL.
 char *c_simple_http_strip_path(const char *path, size_t path_size);
 
-/// Returns a line from the request that starts with the "header" C-string.
-/// If returns non-NULL, must be free'd.
-char *c_simple_http_filter_request_header(
-  const char *request, size_t request_size, const char *header);
+/// Returns non-NULL if successful. Must be freed with
+/// simple_archiver_hash_map_free if non-NULL.
+/// The map is a mapping of lowercase header names to header lines.
+/// E.g. "user-agent" -> "User-Agent: curl".
+SDArchiverHashMap *c_simple_http_request_to_headers_map(
+  const char *request, size_t request_size);
 
 #endif
 

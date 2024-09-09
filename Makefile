@@ -20,7 +20,8 @@ HEADERS = \
 	src/constants.h \
 	src/http.h \
 	src/config.h \
-	src/http_template.h
+	src/http_template.h \
+	src/helpers.h
 
 SOURCES = \
 		src/main.c \
@@ -32,6 +33,7 @@ SOURCES = \
 		src/http.c \
 		src/config.c \
 		src/http_template.c \
+		src/helpers.c \
 		third_party/SimpleArchiver/src/helpers.c \
 		third_party/SimpleArchiver/src/data_structures/linked_list.c \
 		third_party/SimpleArchiver/src/data_structures/hash_map.c \

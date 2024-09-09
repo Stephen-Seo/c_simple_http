@@ -10,6 +10,7 @@ set(c_simple_http_SOURCES
   "${CMAKE_CURRENT_SOURCE_DIR}/src/http.c"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/config.c"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/http_template.c"
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/helpers.c"
   "${CMAKE_CURRENT_SOURCE_DIR}/third_party/SimpleArchiver/src/helpers.c"
   "${CMAKE_CURRENT_SOURCE_DIR}/third_party/SimpleArchiver/src/data_structures/linked_list.c"
   "${CMAKE_CURRENT_SOURCE_DIR}/third_party/SimpleArchiver/src/data_structures/hash_map.c"

@@ -27,6 +27,7 @@
 // Local includes
 #include "constants.h"
 #include "http_template.h"
+#include "helpers.h"
 
 #define REQUEST_TYPE_BUFFER_SIZE 16
 #define REQUEST_PATH_BUFFER_SIZE 256
@@ -209,75 +210,75 @@ char *c_simple_http_strip_path(const char *path, size_t path_size) {
   return stripped_path;
 }
 
-char *c_simple_http_filter_request_header(
-    const char *request, size_t request_size, const char *header) {
-  if (!request) {
-    fprintf(stderr, "ERROR filter_request_header: request is NULL!\n");
-    return NULL;
-  } else if (request_size == 0) {
-    fprintf(stderr, "ERROR filter_request_header: request_size is zero!\n");
-    return NULL;
-  } else if (!header) {
-    fprintf(stderr, "ERROR filter_request_header: header is NULL!\n");
-    return NULL;
-  }
+SDArchiverHashMap *c_simple_http_request_to_headers_map(
+    const char *request, size_t request_size) {
+  SDArchiverHashMap *hash_map = simple_archiver_hash_map_init();
 
-  // xxxx xxx0 - Start of line.
-  // xxxx xxx1 - In middle of line.
-  // xxxx xx0x - Header NOT found.
-  // xxxx xx1x - Header was found.
-  unsigned int flags = 0;
+  // xxxx xx00 - Beginning of line.
+  // xxxx xx01 - Reached end of header key.
+  // xxxx xx10 - Non-header line.
+  unsigned int state = 0;
   size_t idx = 0;
-  size_t line_start_idx = 0;
-  size_t header_idx = 0;
-  for(; idx < request_size && request[idx] != 0; ++idx) {
-    if ((flags & 1) == 0) {
-      if (request[idx] == '\n') {
+  size_t header_key_idx = 0;
+  __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
+  char *key_buf = NULL;
+  size_t key_buf_size = 0;
+  __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
+  char *value_buf = NULL;
+  for (; idx < request_size; ++idx) {
+    if ((state & 3) == 0) {
+      if ((request[idx] >= 'a' && request[idx] <= 'z')
+          || (request[idx] >= 'A' && request[idx] <= 'Z')
+          || request[idx] == '-') {
         continue;
-      }
-      line_start_idx = idx;
-      flags |= 1;
-      if (request[idx] == header[header_idx]) {
-        ++header_idx;
-        if (header[header_idx] == 0) {
-          flags |= 2;
-          break;
-        }
+      } else if (request[idx] == ':') {
+        key_buf_size = idx - header_key_idx + 1;
+        key_buf = malloc(key_buf_size);
+        memcpy(key_buf, request + header_key_idx, key_buf_size - 1);
+        key_buf[key_buf_size - 1] = 0;
+        c_simple_http_helper_to_lowercase_in_place(key_buf, key_buf_size);
+        state &= 0xFFFFFFFC;
+        state |= 1;
       } else {
-        header_idx = 0;
+        state &= 0xFFFFFFFC;
+        state |= 2;
       }
-    } else {
-      if (header_idx != 0) {
-        if (request[idx] == header[header_idx]) {
-          ++header_idx;
-          if (header[header_idx] == 0) {
-            flags |= 2;
-            break;
-          }
-        } else {
-          header_idx = 0;
-        }
-      }
-
+    } else if ((state & 3) == 1) {
       if (request[idx] == '\n') {
-        flags &= 0xFFFFFFFE;
+        size_t value_buf_size = idx - header_key_idx + 1;
+        value_buf = malloc(value_buf_size);
+        memcpy(value_buf, request + header_key_idx, value_buf_size - 1);
+        value_buf[value_buf_size - 1] = 0;
+        simple_archiver_hash_map_insert(
+          hash_map, value_buf, key_buf, key_buf_size, NULL, NULL);
+        key_buf = NULL;
+        value_buf = NULL;
+        key_buf_size = 0;
+        header_key_idx = idx + 1;
+        state &= 0xFFFFFFFC;
       }
+    } else if ((state & 3) == 2) {
+      // Do nothing, just wait until '\n' is parsed.
+    }
+
+    if (request[idx] == '\n') {
+      header_key_idx = idx + 1;
+      state &= 0xFFFFFFFC;
     }
   }
 
-  if ((flags & 2) != 0) {
-    // Get line end starting from line_start_idx.
-    for (
-      idx = line_start_idx;
-      idx < request_size && request[idx] != 0 && request[idx] != '\n';
-      ++idx);
-    char *line_buf = malloc(idx - line_start_idx + 1);
-    memcpy(line_buf, request + line_start_idx, idx - line_start_idx);
-    line_buf[idx - line_start_idx] = 0;
-    return line_buf;
+  if (key_buf && key_buf_size != 0 && !value_buf && idx > header_key_idx) {
+    size_t value_buf_size = idx - header_key_idx + 1;
+    value_buf = malloc(value_buf_size);
+    memcpy(value_buf, request + header_key_idx, value_buf_size - 1);
+    value_buf[value_buf_size - 1] = 0;
+    simple_archiver_hash_map_insert(
+      hash_map, value_buf, key_buf, key_buf_size, NULL, NULL);
+    key_buf = NULL;
+    value_buf = NULL;
   }
 
-  return NULL;
+  return hash_map;
 }
 
 // vim: ts=2 sts=2 sw=2

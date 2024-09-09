@@ -28,6 +28,7 @@ void print_usage(void) {
   puts("  --disable-peer-addr-print");
   puts("  --req-header-to-print=<header> (can be used multiple times)");
   puts("    For example: --req-header-to-print=User-Agent");
+  puts("    Note that this option is case-insensitive");
 }
 
 Args parse_args(int argc, char **argv) {
