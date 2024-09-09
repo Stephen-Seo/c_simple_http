@@ -221,7 +221,7 @@ int main(int argc, char **argv) {
           CHECK_ERROR_WRITE(write(connection_fd, response, response_size));
         } else {
           CHECK_ERROR_WRITE(write(
-            connection_fd, "HTTP/1.1 404 Not Found\n", 23));
+            connection_fd, "HTTP/1.1 500 Internal Server Error\n", 23));
           CHECK_ERROR_WRITE(write(connection_fd, "Allow: GET\n", 11));
           CHECK_ERROR_WRITE(write(
             connection_fd, "Content-Type: text/html\n", 24));
