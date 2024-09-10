@@ -392,8 +392,8 @@ int main(int argc, char **argv) {
       } else {
         const char *response = c_simple_http_response_code_error_to_response(
           response_code);
-        size_t response_size = strlen(response);
         if (response) {
+          response_size = strlen(response);
           CHECK_ERROR_WRITE(write(connection_fd, response, response_size));
         } else {
           CHECK_ERROR_WRITE(write(
