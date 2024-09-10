@@ -55,11 +55,11 @@ int c_simple_http_headers_check_print(void *data, void *ud) {
 
   __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
   char *header_c_str_lowercase = c_simple_http_helper_to_lowercase(
-    header_c_str, strlen(header_c_str) + 1);
+    header_c_str, strlen(header_c_str));
   char *matching_line = simple_archiver_hash_map_get(
     headers_map,
     header_c_str_lowercase,
-    strlen(header_c_str) + 1);
+    strlen(header_c_str_lowercase) + 1);
   if (matching_line) {
     printf("Printing header line: %s\n", matching_line);
   }
