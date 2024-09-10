@@ -19,13 +19,15 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-// Unix includes.
+// Linux/Unix includes.
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <unistd.h>
 #include <signal.h>
 #include <time.h>
 #include <errno.h>
+#include <sys/inotify.h>
+#include <linux/limits.h>
 
 // Third party includes.
 #include <SimpleArchiver/src/helpers.h>
@@ -62,6 +64,13 @@ int c_simple_http_headers_check_print(void *data, void *ud) {
     printf("Printing header line: %s\n", matching_line);
   }
   return 0;
+}
+
+void c_simple_http_inotify_fd_cleanup(int *fd) {
+  if (fd && *fd >= 0) {
+    close(*fd);
+    *fd = -1;
+  }
 }
 
 int main(int argc, char **argv) {
@@ -103,6 +112,34 @@ int main(int argc, char **argv) {
     }
   }
 
+  __attribute__((cleanup(c_simple_http_inotify_fd_cleanup)))
+  int inotify_config_fd = -1;
+  __attribute__((cleanup(simple_archiver_helper_cleanup_malloced)))
+  void *inotify_event_buf = NULL;
+  struct inotify_event *inotify_event = NULL;
+  const size_t inotify_event_buf_size =
+    sizeof(struct inotify_event) + NAME_MAX + 1;
+  if ((args.flags & 0x2) != 0) {
+    inotify_config_fd = inotify_init1(IN_NONBLOCK);
+    if (inotify_config_fd < 0) {
+      fprintf(stderr, "ERROR Failed to init listen on config file for hot "
+        "reloading! (error code \"%d\")\n", errno);
+      return 3;
+    }
+
+    if (inotify_add_watch(
+        inotify_config_fd,
+        args.config_file,
+        IN_MODIFY | IN_CLOSE_WRITE) == -1) {
+      fprintf(stderr, "ERROR Failed to set up listen on config file for hot "
+        "reloading! (error code \"%d\")\n", errno);
+      return 4;
+    }
+
+    inotify_event_buf = malloc(inotify_event_buf_size);
+    inotify_event = inotify_event_buf;
+  }
+
   struct timespec sleep_time;
   sleep_time.tv_sec = 0;
   sleep_time.tv_nsec = C_SIMPLE_HTTP_SLEEP_NANOS;
@@ -112,6 +149,7 @@ int main(int argc, char **argv) {
   peer_info.sin6_family = AF_INET6;
 
   signal(SIGINT, C_SIMPLE_HTTP_handle_sigint);
+  signal(SIGUSR1, C_SIMPLE_HTTP_handle_sigusr1);
 
   unsigned char recv_buf[C_SIMPLE_HTTP_RECV_BUF_SIZE];
 
@@ -121,6 +159,63 @@ int main(int argc, char **argv) {
 
   while (C_SIMPLE_HTTP_KEEP_RUNNING) {
     nanosleep(&sleep_time, NULL);
+
+    if (C_SIMPLE_HTTP_SIGUSR1_SET) {
+      // Handle hot-reloading of config file due to SIGUSR1.
+      C_SIMPLE_HTTP_SIGUSR1_SET = 0;
+      fprintf(stderr, "NOTICE SIGUSR1, reloading config file...\n");
+      c_simple_http_clean_up_parsed_config(&parsed_config);
+      parsed_config = c_simple_http_parse_config(
+        args.config_file,
+        "PATH",
+        NULL);
+    }
+    if ((args.flags & 0x2) != 0) {
+      // Handle hot-reloading of config file.
+      read_ret =
+        read(inotify_config_fd, inotify_event_buf, inotify_event_buf_size);
+      if (read_ret == -1) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+          // No events, do nothing.
+        } else {
+          fprintf(
+            stderr,
+            "WARNING Error code \"%d\" on config file listen for hot "
+            "reloading!\n",
+            errno);
+        }
+      } else if (read_ret > 0) {
+#ifndef NDEBUG
+        printf("DEBUG inotify_event->mask: %x\n", inotify_event->mask);
+#endif
+        if ((inotify_event->mask & IN_MODIFY) != 0
+            || (inotify_event->mask & IN_CLOSE_WRITE) != 0) {
+          fprintf(stderr, "NOTICE Config file modified, reloading...\n");
+          c_simple_http_clean_up_parsed_config(&parsed_config);
+          parsed_config = c_simple_http_parse_config(
+            args.config_file,
+            "PATH",
+            NULL);
+        } else if ((inotify_event->mask & IN_IGNORED) != 0) {
+          fprintf(
+            stderr,
+            "NOTICE Config file modified (IN_IGNORED), reloading...\n");
+          c_simple_http_clean_up_parsed_config(&parsed_config);
+          parsed_config = c_simple_http_parse_config(
+            args.config_file,
+            "PATH",
+            NULL);
+          // Re-initialize inotify.
+          //c_simple_http_inotify_fd_cleanup(&inotify_config_fd);
+          //inotify_config_fd = inotify_init1(IN_NONBLOCK);
+          inotify_add_watch(
+            inotify_config_fd,
+            args.config_file,
+            IN_MODIFY | IN_CLOSE_WRITE);
+        }
+      }
+    }
+
     socket_len = sizeof(struct sockaddr_in6);
     ret = accept(tcp_socket, (struct sockaddr *)&peer_info, &socket_len);
     if (ret == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {

@@ -29,6 +29,7 @@ void print_usage(void) {
   puts("  --req-header-to-print=<header> (can be used multiple times)");
   puts("    For example: --req-header-to-print=User-Agent");
   puts("    Note that this option is case-insensitive");
+  puts("  --enable-reload-config-on-change");
 }
 
 Args parse_args(int argc, char **argv) {
@@ -66,6 +67,8 @@ Args parse_args(int argc, char **argv) {
         free(header_buf);
         exit(1);
       }
+    } else if (strcmp(argv[0], "--enable-reload-config-on-change") == 0) {
+      args.flags |= 2;
     } else {
       puts("ERROR: Invalid args!\n");
       print_usage();

@@ -34,4 +34,13 @@ void C_SIMPLE_HTTP_handle_sigint(int signal) {
   }
 }
 
+void C_SIMPLE_HTTP_handle_sigusr1(int signal) {
+  if (signal == SIGUSR1) {
+#ifndef NDEBUG
+    puts("Handling SIGUSR1");
+#endif
+    C_SIMPLE_HTTP_SIGUSR1_SET = 1;
+  }
+}
+
 // vim: et ts=2 sts=2 sw=2

@@ -23,6 +23,8 @@
 typedef struct Args {
   // xxxx xxx0 - enable peer addr print.
   // xxxx xxx1 - disable peer addr print.
+  // xxxx xx0x - disable listen on config file for reloading.
+  // xxxx xx1x - enable listen on config file for reloading.
   unsigned short flags;
   unsigned short port;
   // Does not need to be free'd, this should point to a string in argv.
