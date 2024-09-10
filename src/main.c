@@ -162,9 +162,9 @@ int main(int argc, char **argv) {
 
   // xxxx xxx1 - config needs to be reloaded.
   unsigned int flags = 0;
-  const unsigned int config_try_reload_ticks =
-    4000000000 / C_SIMPLE_HTTP_SLEEP_NANOS;
-  unsigned int config_try_reload_ticks_count = 0;
+  const size_t config_try_reload_ticks =
+    C_SIMPLE_HTTP_TRY_CONFIG_RELOAD_NANOS / C_SIMPLE_HTTP_SLEEP_NANOS;
+  size_t config_try_reload_ticks_count = 0;
   unsigned int config_try_reload_attempts = 0;
 
   while (C_SIMPLE_HTTP_KEEP_RUNNING) {
