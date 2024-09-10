@@ -162,8 +162,6 @@ int main(int argc, char **argv) {
 
   // xxxx xxx1 - config needs to be reloaded.
   unsigned int flags = 0;
-  const size_t config_try_reload_ticks =
-    C_SIMPLE_HTTP_TRY_CONFIG_RELOAD_NANOS / C_SIMPLE_HTTP_SLEEP_NANOS;
   size_t config_try_reload_ticks_count = 0;
   unsigned int config_try_reload_attempts = 0;
 
@@ -171,7 +169,8 @@ int main(int argc, char **argv) {
     nanosleep(&sleep_time, NULL);
     if ((flags & 0x1) != 0) {
       ++config_try_reload_ticks_count;
-      if (config_try_reload_ticks_count >= config_try_reload_ticks) {
+      if (config_try_reload_ticks_count
+          >= C_SIMPLE_HTTP_TRY_CONFIG_RELOAD_TICKS) {
         config_try_reload_ticks_count = 0;
         ++config_try_reload_attempts;
         fprintf(
