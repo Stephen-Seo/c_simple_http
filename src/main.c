@@ -91,6 +91,9 @@ int main(int argc, char **argv) {
     "PATH",
     NULL
   );
+  if (!parsed_config.hash_map) {
+    return 5;
+  }
 
   __attribute__((cleanup(cleanup_tcp_socket))) int tcp_socket =
     create_tcp_socket(args.port);
@@ -157,18 +160,75 @@ int main(int argc, char **argv) {
   ssize_t read_ret;
   socklen_t socket_len;
 
+  // xxxx xxx1 - config needs to be reloaded.
+  unsigned int flags = 0;
+  const unsigned int config_try_reload_ticks =
+    4000000000 / C_SIMPLE_HTTP_SLEEP_NANOS;
+  unsigned int config_try_reload_ticks_count = 0;
+  unsigned int config_try_reload_attempts = 0;
+
   while (C_SIMPLE_HTTP_KEEP_RUNNING) {
     nanosleep(&sleep_time, NULL);
+    if ((flags & 0x1) != 0) {
+      ++config_try_reload_ticks_count;
+      if (config_try_reload_ticks_count >= config_try_reload_ticks) {
+        config_try_reload_ticks_count = 0;
+        ++config_try_reload_attempts;
+        fprintf(
+          stderr,
+          "Attempting to reload config now (try %u of %u)...\n",
+          config_try_reload_attempts,
+          C_SIMPLE_HTTP_TRY_CONFIG_RELOAD_MAX_ATTEMPTS);
+        C_SIMPLE_HTTP_ParsedConfig new_parsed_config =
+          c_simple_http_parse_config(
+            args.config_file,
+            "PATH",
+            NULL);
+        if (new_parsed_config.hash_map) {
+          c_simple_http_clean_up_parsed_config(&parsed_config);
+          parsed_config = new_parsed_config;
+          flags &= 0xFFFFFFFE;
+          fprintf(stderr, "Reloaded config.\n");
+          if (inotify_add_watch(
+            inotify_config_fd,
+            args.config_file,
+            IN_MODIFY | IN_CLOSE_WRITE) == -1) {
+            fprintf(
+              stderr,
+              "WARNING Failed to set listen on config, autoreloading "
+              "later...\n");
+            flags |= 1;
+          } else {
+            config_try_reload_attempts = 0;
+          }
+        } else {
+          c_simple_http_clean_up_parsed_config(&new_parsed_config);
+          if (config_try_reload_attempts
+              >= C_SIMPLE_HTTP_TRY_CONFIG_RELOAD_MAX_ATTEMPTS) {
+            fprintf(stderr, "ERROR Attempted to reload config too many times,"
+              " stopping!\n");
+            return 6;
+          }
+        }
+      }
+    }
 
     if (C_SIMPLE_HTTP_SIGUSR1_SET) {
       // Handle hot-reloading of config file due to SIGUSR1.
       C_SIMPLE_HTTP_SIGUSR1_SET = 0;
       fprintf(stderr, "NOTICE SIGUSR1, reloading config file...\n");
-      c_simple_http_clean_up_parsed_config(&parsed_config);
-      parsed_config = c_simple_http_parse_config(
+      C_SIMPLE_HTTP_ParsedConfig new_parsed_config = c_simple_http_parse_config(
         args.config_file,
         "PATH",
         NULL);
+      if (new_parsed_config.hash_map) {
+        c_simple_http_clean_up_parsed_config(&parsed_config);
+        parsed_config = new_parsed_config;
+      } else {
+        fprintf(
+          stderr, "WARNING New config is invalid, keeping old config...\n");
+        c_simple_http_clean_up_parsed_config(&new_parsed_config);
+      }
     }
     if ((args.flags & 0x2) != 0) {
       // Handle hot-reloading of config file.
@@ -191,27 +251,49 @@ int main(int argc, char **argv) {
         if ((inotify_event->mask & IN_MODIFY) != 0
             || (inotify_event->mask & IN_CLOSE_WRITE) != 0) {
           fprintf(stderr, "NOTICE Config file modified, reloading...\n");
-          c_simple_http_clean_up_parsed_config(&parsed_config);
-          parsed_config = c_simple_http_parse_config(
-            args.config_file,
-            "PATH",
-            NULL);
+          C_SIMPLE_HTTP_ParsedConfig new_parsed_config =
+            c_simple_http_parse_config(
+              args.config_file,
+              "PATH",
+              NULL);
+          if (new_parsed_config.hash_map) {
+            c_simple_http_clean_up_parsed_config(&parsed_config);
+            parsed_config = new_parsed_config;
+          } else {
+            fprintf(
+              stderr, "WARNING New config is invalid, keeping old config...\n");
+            c_simple_http_clean_up_parsed_config(&new_parsed_config);
+          }
         } else if ((inotify_event->mask & IN_IGNORED) != 0) {
           fprintf(
             stderr,
             "NOTICE Config file modified (IN_IGNORED), reloading...\n");
-          c_simple_http_clean_up_parsed_config(&parsed_config);
-          parsed_config = c_simple_http_parse_config(
-            args.config_file,
-            "PATH",
-            NULL);
+          C_SIMPLE_HTTP_ParsedConfig new_parsed_config =
+            c_simple_http_parse_config(
+              args.config_file,
+              "PATH",
+              NULL);
+          if (new_parsed_config.hash_map) {
+            c_simple_http_clean_up_parsed_config(&parsed_config);
+            parsed_config = new_parsed_config;
+          } else {
+            fprintf(
+              stderr, "WARNING New config is invalid, keeping old config...\n");
+            c_simple_http_clean_up_parsed_config(&new_parsed_config);
+          }
           // Re-initialize inotify.
           //c_simple_http_inotify_fd_cleanup(&inotify_config_fd);
           //inotify_config_fd = inotify_init1(IN_NONBLOCK);
-          inotify_add_watch(
+          if (inotify_add_watch(
             inotify_config_fd,
             args.config_file,
-            IN_MODIFY | IN_CLOSE_WRITE);
+            IN_MODIFY | IN_CLOSE_WRITE) == -1) {
+            fprintf(
+              stderr,
+              "WARNING Failed to set listen on config, autoreloading "
+              "later...\n");
+            flags |= 1;
+          }
         }
       }
     }

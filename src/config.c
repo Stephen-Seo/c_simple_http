@@ -313,6 +313,11 @@ C_SIMPLE_HTTP_ParsedConfig c_simple_http_parse_config(
 
   __attribute__((cleanup(simple_archiver_helper_cleanup_FILE)))
   FILE *f = fopen(config_filename, "r");
+  if (!f) {
+    fprintf(stderr, "ERROR: Failed to open file \"%s\"!\n", config_filename);
+    c_simple_http_clean_up_parsed_config(&config);
+    return config;
+  }
   unsigned char key_buf[C_SIMPLE_HTTP_CONFIG_BUF_SIZE];
   unsigned char value_buf[C_SIMPLE_HTTP_CONFIG_BUF_SIZE];
   unsigned int key_idx = 0;
