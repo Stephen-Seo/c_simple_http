@@ -31,7 +31,6 @@ typedef struct C_SIMPLE_HTTP_INTERNAL_Template_Node {
     size_t orig_end_idx;
     size_t html_capacity;
   };
-  SDArchiverLinkedList *forced_next;
 } C_SIMPLE_HTTP_INTERNAL_Template_Node;
 
 void c_simple_http_internal_free_template_node(void *data) {
@@ -39,9 +38,6 @@ void c_simple_http_internal_free_template_node(void *data) {
   if (node) {
     if (node->html) {
       free(node->html);
-    }
-    if (node->forced_next) {
-      simple_archiver_list_free(&node->forced_next);
     }
     free(node);
   }
@@ -191,7 +187,6 @@ char *c_simple_http_path_to_generated(
             html_buf + last_template_idx,
             template_node->html_size);
           template_node->orig_end_idx = idx + 1;
-          template_node->forced_next = NULL;
           simple_archiver_list_add(template_html_list, template_node,
             c_simple_http_internal_free_template_node);
           template_node = NULL;
@@ -252,7 +247,6 @@ char *c_simple_http_path_to_generated(
               template_node->html_size = (size_t)file_size;
               template_node->html = malloc(template_node->html_size);
               template_node->orig_end_idx = idx + 1;
-              template_node->forced_next = NULL;
 
               if (fread(template_node->html,
                         template_node->html_size,
@@ -272,7 +266,6 @@ char *c_simple_http_path_to_generated(
               memcpy(template_node->html, value_c_str, size);
               template_node->html_size = size;
               template_node->orig_end_idx = idx + 1;
-              template_node->forced_next = NULL;
             }
           } else {
             template_node =
@@ -280,7 +273,6 @@ char *c_simple_http_path_to_generated(
             template_node->html = NULL;
             template_node->html_size = 0;
             template_node->orig_end_idx = idx + 1;
-            template_node->forced_next = NULL;
           }
           simple_archiver_list_add(template_html_list, template_node,
             c_simple_http_internal_free_template_node);
@@ -302,7 +294,6 @@ char *c_simple_http_path_to_generated(
       memcpy(template_node->html, html_buf + last_node->orig_end_idx, size);
       template_node->html_size = size;
       template_node->orig_end_idx = idx + 1;
-      template_node->forced_next = NULL;
       simple_archiver_list_add(template_html_list, template_node,
         c_simple_http_internal_free_template_node);
       template_node = NULL;
