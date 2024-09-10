@@ -11,6 +11,7 @@ A simple HTTP/1.1 server written in C.
       --req-header-to-print=<header> (can be used multiple times)
         For example: --req-header-to-print=User-Agent
         Note that this option is case-insensitive
+      --enable-reload-config-on-change
 
 ## Before Compiling
 
@@ -43,3 +44,9 @@ Without this, the project will fail to build.
     # Access the website.
     # This assumes the server is hosted on port 3000.
     curl localhost:3000
+
+## Other Notes
+
+The config file can be reloaded if the program receives the SIGUSR1 signal.  
+The `--enable-reload-config-on-change` option automatically reloads the config
+file if the config file has changed.
