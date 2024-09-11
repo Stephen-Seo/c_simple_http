@@ -45,6 +45,7 @@ $<IF:$<CONFIG:Debug>,-Og,-fno-delete-null-pointer-checks -fno-strict-overflow -f
 -fstrict-flex-arrays=3
 -fstack-clash-protection -fstack-protector-strong
 -fPIE -pie
+-fno-delete-null-pointer-checks -fno-strict-overflow -fno-strict-aliasing -ftrivial-auto-var-init=zero
 -Werror=implicit -Werror=incompatible-pointer-types -Werror=int-conversion
 )
 
@@ -58,6 +59,7 @@ $<IF:$<CONFIG:Debug>,-Og,-fno-delete-null-pointer-checks -fno-strict-overflow -f
 -Wl,-z,noexecstack
 -Wl,-z,relro -Wl,-z,now
 -fPIE -pie
+-fno-delete-null-pointer-checks -fno-strict-overflow -fno-strict-aliasing -ftrivial-auto-var-init=zero
 -Werror=implicit -Werror=incompatible-pointer-types -Werror=int-conversion
 )
 
@@ -69,6 +71,7 @@ $<IF:$<CONFIG:Debug>,-Og,-fno-delete-null-pointer-checks -fno-strict-overflow -f
 -fstrict-flex-arrays=3
 -fstack-clash-protection -fstack-protector-strong
 -fPIE -pie
+-fno-delete-null-pointer-checks -fno-strict-overflow -fno-strict-aliasing -ftrivial-auto-var-init=zero
 -Werror=implicit -Werror=incompatible-pointer-types -Werror=int-conversion
 )
 
@@ -82,5 +85,6 @@ $<IF:$<CONFIG:Debug>,-Og,-fno-delete-null-pointer-checks -fno-strict-overflow -f
 -Wl,-z,noexecstack
 -Wl,-z,relro -Wl,-z,now
 -fPIE -pie
+-fno-delete-null-pointer-checks -fno-strict-overflow -fno-strict-aliasing -ftrivial-auto-var-init=zero
 -Werror=implicit -Werror=incompatible-pointer-types -Werror=int-conversion
 )
