@@ -5,10 +5,29 @@ COMMON_FLAGS = -Wall -Wextra -Wpedantic \
 DEBUG_FLAGS = -Og -g
 RELEASE_FLAGS = -O3 -DNDEBUG
 
+EXTRA_COMMON_FLAGS =
+ifndef MINIMAL_BUILD_FLAGS
+	EXTRA_COMMON_FLAGS = \
+		-Wformat -Wformat=2 -Wconversion -Wimplicit-fallthrough \
+		-Werror=format-security \
+		-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=3 \
+		-D_GLIBCXX_ASSERTIONS \
+		-fstrict-flex-arrays=3 \
+		-fstack-clash-protection -fstack-protector-strong \
+		-Wl,-z,nodlopen -Wl,-z,noexecstack \
+		-Wl,-z,relro -Wl,-z,now \
+		-Wl,--as-needed -Wl,--no-copy-dt-needed-entries \
+		-fPIE -pie \
+		-fno-delete-null-pointer-checks -fno-strict-overflow \
+		-fno-strict-aliasing -ftrivial-auto-var-init=zero \
+		-Werror=implicit -Werror=incompatible-pointer-types \
+		-Werror=int-conversion
+endif
+
 ifdef RELEASE
-	CFLAGS = ${COMMON_FLAGS} ${RELEASE_FLAGS}
+	CFLAGS = ${COMMON_FLAGS} ${EXTRA_COMMON_FLAGS} ${RELEASE_FLAGS}
 else
-	CFLAGS = ${COMMON_FLAGS} ${DEBUG_FLAGS}
+	CFLAGS = ${COMMON_FLAGS} ${EXTRA_COMMON_FLAGS} ${DEBUG_FLAGS}
 endif
 
 HEADERS = \
