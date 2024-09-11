@@ -44,7 +44,8 @@ $<IF:$<CONFIG:Debug>,-Og,-fno-delete-null-pointer-checks -fno-strict-overflow -f
 -D_GLIBCXX_ASSERTIONS
 -fstrict-flex-arrays=3
 -fstack-clash-protection -fstack-protector-strong
--fPIC
+-fPIE -pie
+-Werror=implicit -Werror=incompatible-pointer-types -Werror=int-conversion
 )
 
 target_link_options(c_simple_http PUBLIC
@@ -56,7 +57,8 @@ $<IF:$<CONFIG:Debug>,-Og,-fno-delete-null-pointer-checks -fno-strict-overflow -f
 -fstack-clash-protection -fstack-protector-strong
 -Wl,-z,noexecstack
 -Wl,-z,relro -Wl,-z,now
--fPIC
+-fPIE -pie
+-Werror=implicit -Werror=incompatible-pointer-types -Werror=int-conversion
 )
 
 target_compile_options(unit_tests PUBLIC
@@ -66,7 +68,8 @@ $<IF:$<CONFIG:Debug>,-Og,-fno-delete-null-pointer-checks -fno-strict-overflow -f
 -D_GLIBCXX_ASSERTIONS
 -fstrict-flex-arrays=3
 -fstack-clash-protection -fstack-protector-strong
--fPIC
+-fPIE -pie
+-Werror=implicit -Werror=incompatible-pointer-types -Werror=int-conversion
 )
 
 target_link_options(unit_tests PUBLIC
@@ -78,5 +81,6 @@ $<IF:$<CONFIG:Debug>,-Og,-fno-delete-null-pointer-checks -fno-strict-overflow -f
 -fstack-clash-protection -fstack-protector-strong
 -Wl,-z,noexecstack
 -Wl,-z,relro -Wl,-z,now
--fPIC
+-fPIE -pie
+-Werror=implicit -Werror=incompatible-pointer-types -Werror=int-conversion
 )
