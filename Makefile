@@ -1,9 +1,9 @@
 CC ?= gcc
 
-COMMON_FLAGS = -Wall -Wextra -Wpedantic \
+COMMON_FLAGS := -Wall -Wextra -Wpedantic \
 	-Ithird_party
-DEBUG_FLAGS = -Og -g
-RELEASE_FLAGS = -O3 -DNDEBUG
+DEBUG_FLAGS := -Og -g
+RELEASE_FLAGS := -O3 -DNDEBUG
 
 ifndef MINIMAL_BUILD_FLAGS
 	COMMON_FLAGS := ${COMMON_FLAGS} \
