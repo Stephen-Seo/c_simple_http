@@ -18,3 +18,8 @@ jobs:
         run: make -C c_simple_http
       - name: Run unit tests
         run: ./c_simple_http/unit_test
+      - name: Build Release build
+        run: make -C c_simple_http clean && make RELEASE=1 -C c_simple_http
+      - name: Run unit tests on Release build
+        run: ./c_simple_http/unit_test
+
