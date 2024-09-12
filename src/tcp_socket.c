@@ -104,7 +104,7 @@ int create_tcp_socket(unsigned short port) {
 }
 
 void cleanup_tcp_socket(int *tcp_socket) {
-  if (tcp_socket && *tcp_socket != -1) {
+  if (tcp_socket && *tcp_socket >= 0) {
     close(*tcp_socket);
     *tcp_socket = -1;
   }
