@@ -199,13 +199,18 @@ char *c_simple_http_strip_path(const char *path, size_t path_size) {
     }
   }
 
-  if (idx >= path_size || path[idx] == 0) {
-    return NULL;
-  }
-
   char *stripped_path = malloc(idx + 1);
   memcpy(stripped_path, path, idx);
   stripped_path[idx] = 0;
+
+  // Strip trailing '/'.
+  while (idx-- > 1) {
+    if (stripped_path[idx] == '/' || stripped_path[idx] == 0) {
+      stripped_path[idx] = 0;
+    } else {
+      break;
+    }
+  }
 
   return stripped_path;
 }

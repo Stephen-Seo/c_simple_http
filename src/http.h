@@ -52,7 +52,7 @@ char *c_simple_http_request_response(
 
 /// Takes a PATH string and returns a "bare" path.
 /// This will simply omit the first instance of "?" or "#" and the rest of the
-/// string.
+/// string. This will also remove trailing "/" characters.
 /// Must be free'd if returns non-NULL.
 char *c_simple_http_strip_path(const char *path, size_t path_size);
 
