@@ -460,6 +460,46 @@ int main(void) {
     ret = simple_archiver_hash_map_get(headers_map, "host", 5);
     ASSERT_TRUE(ret);
     CHECK_STREQ(ret, "Host: some host");
+
+    char *stripped_path_buf = c_simple_http_strip_path("/", 1);
+    CHECK_STREQ(stripped_path_buf, "/");
+    free(stripped_path_buf);
+
+    stripped_path_buf = c_simple_http_strip_path("//", 2);
+    CHECK_STREQ(stripped_path_buf, "/");
+    free(stripped_path_buf);
+
+    stripped_path_buf = c_simple_http_strip_path("///", 3);
+    CHECK_STREQ(stripped_path_buf, "/");
+    free(stripped_path_buf);
+
+    stripped_path_buf = c_simple_http_strip_path("/someurl", 8);
+    CHECK_STREQ(stripped_path_buf, "/someurl");
+    free(stripped_path_buf);
+
+    stripped_path_buf = c_simple_http_strip_path("/someurl/", 9);
+    CHECK_STREQ(stripped_path_buf, "/someurl");
+    free(stripped_path_buf);
+
+    stripped_path_buf = c_simple_http_strip_path("/someurl/////", 13);
+    CHECK_STREQ(stripped_path_buf, "/someurl");
+    free(stripped_path_buf);
+
+    stripped_path_buf = c_simple_http_strip_path("/someurl?key=value", 18);
+    CHECK_STREQ(stripped_path_buf, "/someurl");
+    free(stripped_path_buf);
+
+    stripped_path_buf = c_simple_http_strip_path("/someurl#client_data", 20);
+    CHECK_STREQ(stripped_path_buf, "/someurl");
+    free(stripped_path_buf);
+
+    stripped_path_buf = c_simple_http_strip_path("/someurl////?key=value", 22);
+    CHECK_STREQ(stripped_path_buf, "/someurl");
+    free(stripped_path_buf);
+
+    stripped_path_buf = c_simple_http_strip_path("/someurl///#client_data", 23);
+    CHECK_STREQ(stripped_path_buf, "/someurl");
+    free(stripped_path_buf);
   }
 
   RETURN()
