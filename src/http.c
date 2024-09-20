@@ -55,7 +55,7 @@ const char *c_simple_http_response_code_error_to_response(
 
 char *c_simple_http_request_response(
     const char *request,
-    unsigned int size,
+    uint32_t size,
     const C_SIMPLE_HTTP_HTTPTemplates *templates,
     size_t *out_size,
     enum C_SIMPLE_HTTP_ResponseCode *out_response_code) {
@@ -63,9 +63,9 @@ char *c_simple_http_request_response(
     *out_size = 0;
   }
   // parse first line.
-  unsigned int idx = 0;
+  uint32_t idx = 0;
   char request_type[REQUEST_TYPE_BUFFER_SIZE] = {0};
-  unsigned int request_type_idx = 0;
+  uint32_t request_type_idx = 0;
   for (; idx < size
       && request[idx] != ' '
       && request[idx] != '\n'
@@ -93,7 +93,7 @@ char *c_simple_http_request_response(
       ++idx) {}
   // parse request path.
   char request_path[REQUEST_PATH_BUFFER_SIZE] = {0};
-  unsigned int request_path_idx = 0;
+  uint32_t request_path_idx = 0;
   for (; idx < size
       && request[idx] != ' '
       && request[idx] != '\n'
@@ -121,7 +121,7 @@ char *c_simple_http_request_response(
       ++idx) {}
   // parse request http protocol.
   char request_proto[REQUEST_PROTO_BUFFER_SIZE] = {0};
-  unsigned int request_proto_idx = 0;
+  uint32_t request_proto_idx = 0;
   for (; idx < size
       && request[idx] != ' '
       && request[idx] != '\n'
@@ -222,7 +222,7 @@ SDArchiverHashMap *c_simple_http_request_to_headers_map(
   // xxxx xx00 - Beginning of line.
   // xxxx xx01 - Reached end of header key.
   // xxxx xx10 - Non-header line.
-  unsigned int state = 0;
+  uint32_t state = 0;
   size_t idx = 0;
   size_t header_key_idx = 0;
   __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))

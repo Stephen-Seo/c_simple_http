@@ -30,7 +30,7 @@
 // Local includes.
 #include "big_endian.h"
 
-int create_tcp_socket(unsigned short port) {
+int create_tcp_socket(uint16_t port) {
   struct sockaddr_in6 ipv6_addr;
   memset(&ipv6_addr, 0, sizeof(struct sockaddr_in6));
   ipv6_addr.sin6_family = AF_INET6;

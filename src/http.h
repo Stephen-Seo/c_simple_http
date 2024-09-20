@@ -19,6 +19,7 @@
 
 // Standard library includes.
 #include <stddef.h>
+#include <stdint.h>
 
 // Third party includes.
 #include <SimpleArchiver/src/data_structures/hash_map.h>
@@ -44,7 +45,7 @@ const char *c_simple_http_response_code_error_to_response(
 /// If the request is not valid, or 404, then the buffer will be NULL.
 char *c_simple_http_request_response(
   const char *request,
-  unsigned int size,
+  uint32_t size,
   const C_SIMPLE_HTTP_HTTPTemplates *templates,
   size_t *out_size,
   enum C_SIMPLE_HTTP_ResponseCode *out_response_code

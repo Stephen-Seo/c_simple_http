@@ -17,9 +17,12 @@
 #ifndef SEODISPARATE_COM_C_SIMPLE_HTTP_TCP_SOCKET_H_
 #define SEODISPARATE_COM_C_SIMPLE_HTTP_TCP_SOCKET_H_
 
+// Standard library includes.
+#include <stdint.h>
+
 #define C_SIMPLE_HTTP_TCP_SOCKET_BACKLOG 64
 
-int create_tcp_socket(unsigned short port);
+int create_tcp_socket(uint16_t port);
 
 void cleanup_tcp_socket(int *tcp_socket);
 

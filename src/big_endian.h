@@ -17,9 +17,12 @@
 #ifndef SEODISPARATE_COM_C_SIMPLE_HTTP_BIG_ENDIAN_H_
 #define SEODISPARATE_COM_C_SIMPLE_HTTP_BIG_ENDIAN_H_
 
+// Standard library includes.
+#include <stdint.h>
+
 int is_big_endian(void);
 
-unsigned short u16_be_swap(unsigned short value);
+uint16_t u16_be_swap(uint16_t value);
 
 #endif
 

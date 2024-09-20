@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdint.h>
 
 // Local includes.
 #include "config.h"
@@ -12,8 +13,8 @@
 #include <SimpleArchiver/src/helpers.h>
 #include <SimpleArchiver/src/data_structures/hash_map.h>
 
-static int checks_checked = 0;
-static int checks_passed = 0;
+static int32_t checks_checked = 0;
+static int32_t checks_passed = 0;
 
 #define RETURN() \
   do { \

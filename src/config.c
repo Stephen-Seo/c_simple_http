@@ -237,7 +237,7 @@ typedef struct C_SIMPLE_HTTP_INTERNAL_RequiredIter {
 
 int c_simple_http_required_iter_fn(void *data, void *ud) {
   C_SIMPLE_HTTP_INTERNAL_RequiredIter *req_iter_struct = ud;
-  unsigned int data_str_length = (unsigned int)strlen(data) + 1;
+  uint32_t data_str_length = (uint32_t)strlen(data) + 1;
   if (simple_archiver_hash_map_get(
       req_iter_struct->hash_map,
       data,
@@ -267,7 +267,7 @@ typedef struct C_SIMPLE_HTTP_INTERNAL_RequiredCheck {
 
 int c_simple_http_check_required_iter_fn(void *path_void_str, void *ud) {
   C_SIMPLE_HTTP_INTERNAL_RequiredCheck *req = ud;
-  unsigned int path_void_str_len = (unsigned int)strlen(path_void_str) + 1;
+  uint32_t path_void_str_len = (uint32_t)strlen(path_void_str) + 1;
   C_SIMPLE_HTTP_HashMapWrapper *wrapper =
     simple_archiver_hash_map_get(
       req->map_of_paths_and_their_vars,
@@ -303,8 +303,8 @@ C_SIMPLE_HTTP_ParsedConfig c_simple_http_parse_config(
     fprintf(stderr, "ERROR: separating_key argument is NULL!\n");
     return config;
   }
-  const unsigned int separating_key_size =
-    (unsigned int)strlen(separating_key) + 1;
+  const uint32_t separating_key_size =
+    (uint32_t)strlen(separating_key) + 1;
 
   config.hash_map = simple_archiver_hash_map_init();
 
@@ -320,21 +320,21 @@ C_SIMPLE_HTTP_ParsedConfig c_simple_http_parse_config(
   }
   unsigned char key_buf[C_SIMPLE_HTTP_CONFIG_BUF_SIZE];
   unsigned char value_buf[C_SIMPLE_HTTP_CONFIG_BUF_SIZE];
-  unsigned int key_idx = 0;
-  unsigned int value_idx = 0;
+  uint32_t key_idx = 0;
+  uint32_t value_idx = 0;
   __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
   char *current_separating_key_value = NULL;
-  unsigned int current_separating_key_value_size = 0;
+  uint32_t current_separating_key_value_size = 0;
 
   // xxx0 - reading key
   // xxx1 - reading value
   // 00xx - reading value is not quoted
   // 01xx - reading value is single quoted
   // 10xx - reading value is double quoted
-  unsigned int state = 0;
+  uint32_t state = 0;
   unsigned char single_quote_count = 0;
   unsigned char double_quote_count = 0;
-  int c;
+  int32_t c;
 
   while (feof(f) == 0) {
     c = fgetc(f);

@@ -18,14 +18,14 @@
 
 int is_big_endian(void) {
   union {
-    int i;
+    int32_t i;
     char c[4];
   } bint = {0x01020304};
 
   return bint.c[0] == 1 ? 1 : 0;
 }
 
-unsigned short u16_be_swap(unsigned short value) {
+uint16_t u16_be_swap(uint16_t value) {
   if (is_big_endian()) {
     return value;
   } else {

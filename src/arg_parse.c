@@ -32,7 +32,7 @@ void print_usage(void) {
   puts("  --enable-reload-config-on-change");
 }
 
-Args parse_args(int argc, char **argv) {
+Args parse_args(int32_t argc, char **argv) {
   --argc;
   ++argv;
 
@@ -44,9 +44,9 @@ Args parse_args(int argc, char **argv) {
   while (argc > 0) {
     if ((strcmp(argv[0], "-p") == 0 || strcmp(argv[0], "--port") == 0)
         && argc > 1) {
-      int value = atoi(argv[1]);
+      int32_t value = atoi(argv[1]);
       if (value >= 0 && value <= 0xFFFF) {
-        args.port = (unsigned short) value;
+        args.port = (uint16_t) value;
       }
       --argc;
       ++argv;

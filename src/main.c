@@ -18,6 +18,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdint.h>
 
 // Linux/Unix includes.
 #include <sys/socket.h>
@@ -161,9 +162,9 @@ int main(int argc, char **argv) {
   socklen_t socket_len;
 
   // xxxx xxx1 - config needs to be reloaded.
-  unsigned int flags = 0;
+  uint32_t flags = 0;
   size_t config_try_reload_ticks_count = 0;
-  unsigned int config_try_reload_attempts = 0;
+  uint32_t config_try_reload_attempts = 0;
 
   while (C_SIMPLE_HTTP_KEEP_RUNNING) {
     nanosleep(&sleep_time, NULL);
@@ -307,7 +308,7 @@ int main(int argc, char **argv) {
       // Received connection, handle it.
       if ((args.flags & 1) == 0) {
         printf("Peer connected: addr is ");
-        for (unsigned int idx = 0; idx < 16; ++idx) {
+        for (uint32_t idx = 0; idx < 16; ++idx) {
           if (idx % 2 == 0 && idx > 0) {
             printf(":");
           }
@@ -328,7 +329,7 @@ int main(int argc, char **argv) {
       }
 #ifndef NDEBUG
       // DEBUG print received buf.
-      for (unsigned int idx = 0;
+      for (uint32_t idx = 0;
           idx < C_SIMPLE_HTTP_RECV_BUF_SIZE && idx < read_ret;
           ++idx) {
         if ((recv_buf[idx] >= 0x20 && recv_buf[idx] <= 0x7E)
@@ -355,7 +356,7 @@ int main(int argc, char **argv) {
       enum C_SIMPLE_HTTP_ResponseCode response_code;
       const char *response = c_simple_http_request_response(
         (const char*)recv_buf,
-        (unsigned int)read_ret,
+        (uint32_t)read_ret,
         &parsed_config,
         &response_size,
         &response_code);
@@ -368,7 +369,7 @@ int main(int argc, char **argv) {
         size_t content_length_buf_size = 0;
         memcpy(content_length_buf, "Content-Length: ", 16);
         content_length_buf_size = 16;
-        int written = 0;
+        int32_t written = 0;
         snprintf(
           content_length_buf + content_length_buf_size,
           127 - content_length_buf_size,

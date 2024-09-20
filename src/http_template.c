@@ -19,6 +19,7 @@
 // Standard library includes.
 #include <string.h>
 #include <stdlib.h>
+#include <stdint.h>
 
 // Third party includes.
 #include <SimpleArchiver/src/data_structures/linked_list.h>
@@ -104,7 +105,7 @@ char *c_simple_http_path_to_generated(
     fprintf(stderr, "ERROR: Path string is too large!\n");
     return NULL;
   }
-  unsigned int path_len = (unsigned int)path_len_size_t;
+  uint32_t path_len = (uint32_t)path_len_size_t;
   C_SIMPLE_HTTP_ParsedConfig *wrapped_hash_map =
     simple_archiver_hash_map_get(templates->hash_map, path, path_len);
   if (!wrapped_hash_map) {
@@ -164,7 +165,7 @@ char *c_simple_http_path_to_generated(
 
   // xxxx xxx0 - Initial state, no delimeter reached.
   // xxxx xxx1 - Three left-curly-brace delimeters reached.
-  unsigned int state = 0;
+  uint32_t state = 0;
 
   for (; idx < html_buf_size; ++idx) {
     if ((state & 1) == 0) {
@@ -216,7 +217,7 @@ char *c_simple_http_path_to_generated(
             simple_archiver_hash_map_get(
               wrapped_hash_map->hash_map,
               var,
-              (unsigned int)var_size + 1);
+              (uint32_t)var_size + 1);
           if (value_c_str) {
             if (c_simple_http_internal_ends_with_FILE(var) == 0) {
               // Load from file specified by "value_c_str".
