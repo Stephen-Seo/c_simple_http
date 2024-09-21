@@ -20,8 +20,8 @@
 // Standard library includes.
 #include <stdint.h>
 
-extern int_fast8_t C_SIMPLE_HTTP_KEEP_RUNNING;
-extern int_fast8_t C_SIMPLE_HTTP_SIGUSR1_SET;
+extern volatile int_fast8_t C_SIMPLE_HTTP_KEEP_RUNNING;
+extern volatile int_fast8_t C_SIMPLE_HTTP_SIGUSR1_SET;
 
 #endif
 
