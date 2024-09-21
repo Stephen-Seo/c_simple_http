@@ -16,7 +16,7 @@
 
 #include "globals.h"
 
-int C_SIMPLE_HTTP_KEEP_RUNNING = 1;
-int C_SIMPLE_HTTP_SIGUSR1_SET = 0;
+int_fast8_t C_SIMPLE_HTTP_KEEP_RUNNING = 1;
+int_fast8_t C_SIMPLE_HTTP_SIGUSR1_SET = 0;
 
 // vim: et ts=2 sts=2 sw=2

@@ -17,8 +17,11 @@
 #ifndef SEODISPARATE_COM_C_SIMPLE_HTTP_GLOBALS_H_
 #define SEODISPARATE_COM_C_SIMPLE_HTTP_GLOBALS_H_
 
-extern int C_SIMPLE_HTTP_KEEP_RUNNING;
-extern int C_SIMPLE_HTTP_SIGUSR1_SET;
+// Standard library includes.
+#include <stdint.h>
+
+extern int_fast8_t C_SIMPLE_HTTP_KEEP_RUNNING;
+extern int_fast8_t C_SIMPLE_HTTP_SIGUSR1_SET;
 
 #endif
 
