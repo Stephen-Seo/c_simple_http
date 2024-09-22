@@ -96,6 +96,7 @@ char *c_simple_http_combine_string_parts(const SDArchiverLinkedList *list) {
   if (simple_archiver_list_get(
       list, c_simple_http_internal_combine_string_parts_from_list, ptrs)) {
     free(buf);
+    free(ptrs);
     return NULL;
   }
 
