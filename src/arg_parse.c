@@ -109,7 +109,7 @@ Args parse_args(int32_t argc, char **argv) {
         printf("Directory \"%s\" exists.\n", args.cache_dir);
       }
     } else {
-      puts("ERROR: Invalid args!\n");
+      fprintf(stderr, "ERROR: Invalid args!\n");
       print_usage();
       exit(1);
     }
