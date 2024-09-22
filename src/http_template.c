@@ -96,9 +96,13 @@ int c_simple_http_internal_ends_with_FILE(const char *c_string) {
 char *c_simple_http_path_to_generated(
     const char *path,
     const C_SIMPLE_HTTP_HTTPTemplates *templates,
-    size_t *output_buf_size) {
+    size_t *output_buf_size,
+    SDArchiverLinkedList **files_list_out) {
   if (output_buf_size) {
     *output_buf_size = 0;
+  }
+  if (files_list_out) {
+    *files_list_out = simple_archiver_list_init();
   }
   size_t path_len_size_t = strlen(path) + 1;
   if (path_len_size_t > 0xFFFFFFFF) {
@@ -139,6 +143,11 @@ char *c_simple_http_path_to_generated(
     }
     html_buf[html_file_size] = 0;
     html_buf_size = (size_t)html_file_size;
+    if (files_list_out) {
+      char *html_filename_copy = malloc(strlen(html_filename) + 1);
+      strcpy(html_filename_copy, html_filename);
+      simple_archiver_list_add(*files_list_out, html_filename_copy, NULL);
+    }
   } else {
     char *stored_html =
       simple_archiver_hash_map_get(wrapped_hash_map->hash_map, "HTML", 5);
@@ -257,6 +266,12 @@ char *c_simple_http_path_to_generated(
                 fprintf(stderr, "ERROR Failed to read from file \"%s\"!\n",
                         value_c_str);
                 return NULL;
+              }
+              if (files_list_out) {
+                char *variable_filename = malloc(strlen(value_c_str) + 1);
+                strcpy(variable_filename, value_c_str);
+                simple_archiver_list_add(
+                    *files_list_out, variable_filename, NULL);
               }
             } else {
               // Variable data is "value_c_str".

@@ -162,7 +162,8 @@ char *c_simple_http_request_response(
   char *generated_buf = c_simple_http_path_to_generated(
     stripped_path ? stripped_path : request_path,
     templates,
-    &generated_size);
+    &generated_size,
+    NULL); // TODO Use the output parameter "filenames list" here.
 
   if (!generated_buf || generated_size == 0) {
     fprintf(stderr, "ERROR Unable to generate response html for path \"%s\"!\n",

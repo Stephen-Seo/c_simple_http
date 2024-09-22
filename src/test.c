@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 // Local includes.
+#include "SimpleArchiver/src/data_structures/linked_list.h"
 #include "config.h"
 #include "http_template.h"
 #include "http.h"
@@ -87,6 +88,15 @@ void test_internal_cleanup_delete_temporary_file(const char **filename) {
       fprintf(stderr, "ERROR Failed to remove file \"%s\"!\n", *filename);
     }
   }
+}
+
+int test_internal_check_matching_string_in_list(void *value, void *ud) {
+  if (value && ud) {
+    if (strcmp(value, ud) == 0) {
+      return 1;
+    }
+  }
+  return 0;
 }
 
 int main(void) {
@@ -252,12 +262,18 @@ int main(void) {
 
     size_t output_buf_size;
 
+    __attribute__((cleanup(simple_archiver_list_free)))
+    SDArchiverLinkedList *filenames_list = NULL;
+
     __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
-    char *buf = c_simple_http_path_to_generated("/", &config, &output_buf_size);
+    char *buf = c_simple_http_path_to_generated(
+        "/", &config, &output_buf_size, &filenames_list);
     ASSERT_TRUE(buf != NULL);
     ASSERT_TRUE(strcmp(buf, "<h1>Test</h1>") == 0);
     CHECK_TRUE(output_buf_size == 13);
+    CHECK_TRUE(filenames_list->count == 0);
     simple_archiver_helper_cleanup_c_string(&buf);
+    simple_archiver_list_free(&filenames_list);
 
     __attribute__((cleanup(test_internal_cleanup_delete_temporary_file)))
     const char *test_http_template_filename2 =
@@ -288,7 +304,8 @@ int main(void) {
     );
     ASSERT_TRUE(config.paths != NULL);
 
-    buf = c_simple_http_path_to_generated("/", &config, &output_buf_size);
+    buf = c_simple_http_path_to_generated(
+        "/", &config, &output_buf_size, &filenames_list);
     ASSERT_TRUE(buf != NULL);
     printf("%s\n", buf);
     ASSERT_TRUE(
@@ -297,7 +314,9 @@ int main(void) {
         "<h1> Some text. </h1><br><h2> More text. </h2>")
       == 0);
     CHECK_TRUE(output_buf_size == 46);
+    CHECK_TRUE(filenames_list->count == 0);
     simple_archiver_helper_cleanup_c_string(&buf);
+    simple_archiver_list_free(&filenames_list);
 
     __attribute__((cleanup(test_internal_cleanup_delete_temporary_file)))
     const char *test_http_template_filename3 =
@@ -351,7 +370,8 @@ int main(void) {
     );
     ASSERT_TRUE(config.paths != NULL);
 
-    buf = c_simple_http_path_to_generated("/", &config, &output_buf_size);
+    buf = c_simple_http_path_to_generated(
+        "/", &config, &output_buf_size, &filenames_list);
     ASSERT_TRUE(buf != NULL);
     printf("%s\n", buf);
     ASSERT_TRUE(
@@ -360,7 +380,14 @@ int main(void) {
         "<h1> testVar text. </h1><br><h2> testVar2 text. </h2>")
       == 0);
     CHECK_TRUE(output_buf_size == 53);
+    CHECK_TRUE(filenames_list->count == 1);
+    CHECK_TRUE(simple_archiver_list_get(
+        filenames_list,
+        test_internal_check_matching_string_in_list,
+        (void*)test_http_template_html_filename)
+      != NULL);
     simple_archiver_helper_cleanup_c_string(&buf);
+    simple_archiver_list_free(&filenames_list);
 
     __attribute__((cleanup(test_internal_cleanup_delete_temporary_file)))
     const char *test_http_template_filename4 =
@@ -434,7 +461,8 @@ int main(void) {
     );
     ASSERT_TRUE(config.paths != NULL);
 
-    buf = c_simple_http_path_to_generated("/", &config, &output_buf_size);
+    buf = c_simple_http_path_to_generated(
+        "/", &config, &output_buf_size, &filenames_list);
     ASSERT_TRUE(buf != NULL);
     printf("%s\n", buf);
     ASSERT_TRUE(
@@ -443,6 +471,17 @@ int main(void) {
         "<h1> some test text in test var file. </h1>")
       == 0);
     CHECK_TRUE(output_buf_size == 43);
+    CHECK_TRUE(filenames_list->count == 2);
+    CHECK_TRUE(simple_archiver_list_get(
+        filenames_list,
+        test_internal_check_matching_string_in_list,
+        (void*)test_http_template_html_filename2)
+      != NULL);
+    CHECK_TRUE(simple_archiver_list_get(
+        filenames_list,
+        test_internal_check_matching_string_in_list,
+        (void*)test_http_template_html_var_filename)
+      != NULL);
     simple_archiver_helper_cleanup_c_string(&buf);
   }
 
