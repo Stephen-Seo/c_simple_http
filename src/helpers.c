@@ -18,6 +18,93 @@
 
 // Standard library includes.
 #include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+
+int c_simple_http_internal_get_string_part_full_size(void *data, void *ud) {
+  C_SIMPLE_HTTP_String_Part *part = data;
+  size_t *count = ud;
+
+  *count += part->size - 1;
+
+  return 0;
+}
+
+int c_simple_http_internal_combine_string_parts_from_list(void *data, void *ud) {
+  C_SIMPLE_HTTP_String_Part *part = data;
+  void **ptrs = ud;
+  char *buf = ptrs[0];
+  size_t *current_count = ptrs[1];
+  const size_t *total_count = ptrs[2];
+
+  if (*current_count + part->size - 1 > *total_count) {
+    fprintf(stderr, "ERROR Invalid state combining string parts!\n");
+    return 1;
+  }
+
+  memcpy(buf + *current_count, part->buf, part->size - 1);
+
+  *current_count += part->size - 1;
+
+  return 0;
+}
+
+void c_simple_http_cleanup_string_part(void *data) {
+  C_SIMPLE_HTTP_String_Part *part = data;
+  if (part) {
+    if (part->buf) {
+      free(part->buf);
+      part->buf = NULL;
+    }
+    free(part);
+  }
+}
+
+void c_simple_http_add_string_part(
+    SDArchiverLinkedList *list, const char *c_string, size_t extra) {
+  C_SIMPLE_HTTP_String_Part *string_part =
+    malloc(sizeof(C_SIMPLE_HTTP_String_Part));
+
+  string_part->size = strlen(c_string) + 1;
+  string_part->buf = malloc(string_part->size);
+  memcpy(string_part->buf, c_string, string_part->size);
+
+  string_part->extra = extra;
+
+  simple_archiver_list_add(
+    list, string_part, c_simple_http_cleanup_string_part);
+}
+
+char *c_simple_http_combine_string_parts(const SDArchiverLinkedList *list) {
+  if (!list || list->count == 0) {
+    return NULL;
+  }
+
+  size_t count = 0;
+
+  simple_archiver_list_get(
+    list, c_simple_http_internal_get_string_part_full_size, &count);
+
+  char *buf = malloc(count + 1);
+  size_t current_count = 0;
+
+  void **ptrs = malloc(sizeof(void*) * 3);
+  ptrs[0] = buf;
+  ptrs[1] = &current_count;
+  ptrs[2] = &count;
+
+  if (simple_archiver_list_get(
+      list, c_simple_http_internal_combine_string_parts_from_list, ptrs)) {
+    free(buf);
+    return NULL;
+  }
+
+  free(ptrs);
+
+  buf[count] = 0;
+
+  return buf;
+}
 
 void c_simple_http_helper_to_lowercase_in_place(char *buf, size_t size) {
   for (size_t idx = 0; idx < size; ++idx) {

@@ -20,6 +20,27 @@
 // Standard library includes.
 #include <stddef.h>
 
+// Third-party includes.
+#include <SimpleArchiver/src/data_structures/linked_list.h>
+
+typedef struct C_SIMPLE_HTTP_String_Part {
+  char *buf;
+  size_t size;
+  size_t extra;
+} C_SIMPLE_HTTP_String_Part;
+
+/// Assumes "data" is a C_SIMPLE_HTTP_String_Part, "data" was malloced, and
+/// "data->buf" was malloced.
+void c_simple_http_cleanup_string_part(void *data);
+
+/// Puts a malloced instance of String_Part into the list.
+/// The given c_string will be copied into a newly malloced buffer.
+void c_simple_http_add_string_part(
+  SDArchiverLinkedList *list, const char *c_string, size_t extra);
+
+/// Combines all String_Parts in the list and returns it as a single buffer.
+char *c_simple_http_combine_string_parts(const SDArchiverLinkedList *list);
+
 /// Modifies "buf" in-place to change all uppercase to lowercase alpha chars.
 void c_simple_http_helper_to_lowercase_in_place(char *buf, size_t size);
 

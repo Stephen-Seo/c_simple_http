@@ -5,14 +5,15 @@
 #include <stdint.h>
 
 // Local includes.
-#include "SimpleArchiver/src/data_structures/linked_list.h"
 #include "config.h"
+#include "helpers.h"
 #include "http_template.h"
 #include "http.h"
 
 // Third party includes.
 #include <SimpleArchiver/src/helpers.h>
 #include <SimpleArchiver/src/data_structures/hash_map.h>
+#include <SimpleArchiver/src/data_structures/linked_list.h>
 
 static int32_t checks_checked = 0;
 static int32_t checks_passed = 0;
@@ -540,6 +541,21 @@ int main(void) {
     stripped_path_buf = c_simple_http_strip_path("/someurl///#client_data", 23);
     CHECK_STREQ(stripped_path_buf, "/someurl");
     free(stripped_path_buf);
+  }
+
+  // Test helpers.
+  {
+    __attribute__((cleanup(simple_archiver_list_free)))
+    SDArchiverLinkedList *list = simple_archiver_list_init();
+
+    c_simple_http_add_string_part(list, "one\n", 0);
+    c_simple_http_add_string_part(list, "two\n", 0);
+    c_simple_http_add_string_part(list, "three\n", 0);
+
+    __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
+    char *buf = c_simple_http_combine_string_parts(list);
+    ASSERT_TRUE(buf);
+    ASSERT_TRUE(strcmp(buf, "one\ntwo\nthree\n") == 0);
   }
 
   RETURN()
