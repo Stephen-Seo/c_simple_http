@@ -2,3 +2,5 @@
 /objs/
 /unit_test
 /build*/
+/.cache/
+/compile_commands.json
