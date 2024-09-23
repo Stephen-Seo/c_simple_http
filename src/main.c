@@ -363,6 +363,7 @@ int main(int argc, char **argv) {
       if (response && response_code == C_SIMPLE_HTTP_Response_200_OK) {
         CHECK_ERROR_WRITE(write(connection_fd, "HTTP/1.1 200 OK\n", 16));
         CHECK_ERROR_WRITE(write(connection_fd, "Allow: GET\n", 11));
+        CHECK_ERROR_WRITE(write(connection_fd, "Connection: close\n", 18));
         CHECK_ERROR_WRITE(write(
           connection_fd, "Content-Type: text/html\n", 24));
         char content_length_buf[128];
@@ -400,6 +401,7 @@ int main(int argc, char **argv) {
           CHECK_ERROR_WRITE(write(
             connection_fd, "HTTP/1.1 500 Internal Server Error\n", 35));
           CHECK_ERROR_WRITE(write(connection_fd, "Allow: GET\n", 11));
+          CHECK_ERROR_WRITE(write(connection_fd, "Connection: close\n", 18));
           CHECK_ERROR_WRITE(write(
             connection_fd, "Content-Type: text/html\n", 24));
           CHECK_ERROR_WRITE(write(connection_fd, "Content-Length: 35\n", 19));

@@ -39,16 +39,21 @@ const char *c_simple_http_response_code_error_to_response(
     enum C_SIMPLE_HTTP_ResponseCode response_code) {
   switch (response_code) {
     case C_SIMPLE_HTTP_Response_400_Bad_Request:
-      return "HTTP/1.1 400 Bad Request\nAllow: GET\nContent-Type: text/html\n"
+      return "HTTP/1.1 400 Bad Request\nAllow: GET\n"
+             "Connection: close\n"
+             "Content-Type: text/html\n"
              "Content-Length: 25\n\n"
              "<h1>400 Bad Request</h1>\n";
     case C_SIMPLE_HTTP_Response_404_Not_Found:
-      return "HTTP/1.1 404 Not Found\nAllow: GET\nContent-Type: text/html\n"
+      return "HTTP/1.1 404 Not Found\nAllow: GET\n"
+             "Connection: close\n"
+             "Content-Type: text/html\n"
              "Content-Length: 23\n\n"
              "<h1>404 Not Found</h1>\n";
     case C_SIMPLE_HTTP_Response_500_Internal_Server_Error:
     default:
       return "HTTP/1.1 500 Internal Server Error\nAllow: GET\n"
+             "Connection: close\n"
              "Content-Type: text/html\n"
              "Content-Length: 35\n\n"
              "<h1>500 Internal Server Error</h1>\n";
