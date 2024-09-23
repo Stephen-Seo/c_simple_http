@@ -29,6 +29,8 @@ typedef struct C_SIMPLE_HTTP_String_Part {
   size_t extra;
 } C_SIMPLE_HTTP_String_Part;
 
+void c_simple_http_cleanup_attr_string_part(C_SIMPLE_HTTP_String_Part **);
+
 /// Assumes "data" is a C_SIMPLE_HTTP_String_Part, "data" was malloced, and
 /// "data->buf" was malloced.
 void c_simple_http_cleanup_string_part(void *data);

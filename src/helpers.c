@@ -30,12 +30,18 @@ int c_simple_http_internal_get_string_part_full_size(void *data, void *ud) {
   return 0;
 }
 
-int c_simple_http_internal_combine_string_parts_from_list(void *data, void *ud) {
+int c_simple_http_internal_combine_string_parts_from_list(void *data,
+                                                          void *ud) {
   C_SIMPLE_HTTP_String_Part *part = data;
   void **ptrs = ud;
   char *buf = ptrs[0];
   size_t *current_count = ptrs[1];
   const size_t *total_count = ptrs[2];
+
+  if (!part->buf || part->size == 0) {
+    // Empty string part, just continue.
+    return 0;
+  }
 
   if (*current_count + part->size - 1 > *total_count) {
     fprintf(stderr, "ERROR Invalid state combining string parts!\n");
@@ -49,12 +55,21 @@ int c_simple_http_internal_combine_string_parts_from_list(void *data, void *ud) 
   return 0;
 }
 
+void c_simple_http_cleanup_attr_string_part(C_SIMPLE_HTTP_String_Part **part) {
+  if (part && *part) {
+    if ((*part)->buf) {
+      free((*part)->buf);
+    }
+    free(*part);
+  }
+  *part = NULL;
+}
+
 void c_simple_http_cleanup_string_part(void *data) {
   C_SIMPLE_HTTP_String_Part *part = data;
   if (part) {
     if (part->buf) {
       free(part->buf);
-      part->buf = NULL;
     }
     free(part);
   }

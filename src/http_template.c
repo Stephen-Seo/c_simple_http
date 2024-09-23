@@ -25,53 +25,8 @@
 #include <SimpleArchiver/src/data_structures/linked_list.h>
 #include <SimpleArchiver/src/helpers.h>
 
-typedef struct C_SIMPLE_HTTP_INTERNAL_Template_Node {
-  char *html;
-  size_t html_size;
-  union {
-    size_t orig_end_idx;
-    size_t html_capacity;
-  };
-} C_SIMPLE_HTTP_INTERNAL_Template_Node;
-
-void c_simple_http_internal_free_template_node(void *data) {
-  C_SIMPLE_HTTP_INTERNAL_Template_Node *node = data;
-  if (node) {
-    if (node->html) {
-      free(node->html);
-    }
-    free(node);
-  }
-}
-
-void c_simple_http_internal_cleanup_template_node(
-    C_SIMPLE_HTTP_INTERNAL_Template_Node **node) {
-  if (node && *node) {
-    c_simple_http_internal_free_template_node(*node);
-    *node = NULL;
-  }
-}
-
-int c_simple_http_internal_get_final_size_fn(void *data, void *ud) {
-  size_t *final_size = ud;
-  C_SIMPLE_HTTP_INTERNAL_Template_Node *node = data;
-  *final_size += node->html_size;
-  return 0;
-}
-
-int c_simple_http_internal_fill_buf_fn(void *data, void *ud) {
-  C_SIMPLE_HTTP_INTERNAL_Template_Node *node = data;
-  C_SIMPLE_HTTP_INTERNAL_Template_Node *to_fill = ud;
-  if (to_fill->html_capacity < to_fill->html_size + node->html_size) {
-    return 1;
-  }
-  memcpy(
-    to_fill->html + to_fill->html_size,
-    node->html,
-    node->html_size);
-  to_fill->html_size += node->html_size;
-  return 0;
-}
+// Local includes.
+#include "helpers.h"
 
 /// Returns 0 if "c_string" ends with "_FILE".
 int c_simple_http_internal_ends_with_FILE(const char *c_string) {
@@ -162,13 +117,12 @@ char *c_simple_http_path_to_generated(
 
   // At this point, html_buf contains the raw HTML as a C-string.
   __attribute__((cleanup(simple_archiver_list_free)))
-  SDArchiverLinkedList *template_html_list = simple_archiver_list_init();
+  SDArchiverLinkedList *string_part_list = simple_archiver_list_init();
 
   size_t idx = 0;
   size_t last_template_idx = 0;
 
-  __attribute__((cleanup(c_simple_http_internal_cleanup_template_node)))
-  C_SIMPLE_HTTP_INTERNAL_Template_Node *template_node = NULL;
+  C_SIMPLE_HTTP_String_Part string_part;
 
   size_t delimeter_count = 0;
 
@@ -184,22 +138,23 @@ char *c_simple_http_path_to_generated(
         if (delimeter_count >= 3) {
           delimeter_count = 0;
           state |= 1;
-          if (template_html_list->count != 0) {
-            C_SIMPLE_HTTP_INTERNAL_Template_Node *last_node =
-              template_html_list->tail->prev->data;
-            last_template_idx = last_node->orig_end_idx;
+          if (string_part_list->count != 0) {
+            C_SIMPLE_HTTP_String_Part *last_part =
+              string_part_list->tail->prev->data;
+            last_template_idx = last_part->extra;
           }
-          template_node = malloc(sizeof(C_SIMPLE_HTTP_INTERNAL_Template_Node));
-          template_node->html_size = idx - last_template_idx - 2;
-          template_node->html = malloc(template_node->html_size);
+          string_part.size = idx - last_template_idx - 1;
+          string_part.buf = malloc(string_part.size);
           memcpy(
-            template_node->html,
+            string_part.buf,
             html_buf + last_template_idx,
-            template_node->html_size);
-          template_node->orig_end_idx = idx + 1;
-          simple_archiver_list_add(template_html_list, template_node,
-            c_simple_http_internal_free_template_node);
-          template_node = NULL;
+            string_part.size);
+          string_part.buf[string_part.size - 1] = 0;
+          string_part.extra = idx + 1;
+          c_simple_http_add_string_part(string_part_list,
+                                        string_part.buf,
+                                        string_part.extra);
+          free(string_part.buf);
         }
       } else {
         delimeter_count = 0;
@@ -212,14 +167,14 @@ char *c_simple_http_path_to_generated(
         if (delimeter_count >= 3) {
           delimeter_count = 0;
           state &= 0xFFFFFFFE;
-          C_SIMPLE_HTTP_INTERNAL_Template_Node *last_node =
-            template_html_list->tail->prev->data;
-          size_t var_size = idx - 2 - last_node->orig_end_idx;
+          C_SIMPLE_HTTP_String_Part *last_part =
+            string_part_list->tail->prev->data;
+          size_t var_size = idx - 2 - last_part->extra;
           __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
           char *var = malloc(var_size + 1);
           memcpy(
             var,
-            html_buf + last_node->orig_end_idx,
+            html_buf + last_part->extra,
             var_size);
           var[var_size] = 0;
           const char *value_c_str =
@@ -252,14 +207,12 @@ char *c_simple_http_path_to_generated(
                         value_c_str);
                 return NULL;
               }
-              template_node =
-                malloc(sizeof(C_SIMPLE_HTTP_INTERNAL_Template_Node));
-              template_node->html_size = (size_t)file_size;
-              template_node->html = malloc(template_node->html_size);
-              template_node->orig_end_idx = idx + 1;
+              string_part.size = (size_t)file_size + 1;
+              string_part.buf = malloc(string_part.size);
+              string_part.extra = idx + 1;
 
-              if (fread(template_node->html,
-                        template_node->html_size,
+              if (fread(string_part.buf,
+                        string_part.size - 1,
                         1,
                         f)
                     != 1) {
@@ -267,6 +220,7 @@ char *c_simple_http_path_to_generated(
                         value_c_str);
                 return NULL;
               }
+              string_part.buf[string_part.size - 1] = 0;
               if (files_list_out) {
                 char *variable_filename = malloc(strlen(value_c_str) + 1);
                 strcpy(variable_filename, value_c_str);
@@ -275,24 +229,21 @@ char *c_simple_http_path_to_generated(
               }
             } else {
               // Variable data is "value_c_str".
-              template_node =
-                malloc(sizeof(C_SIMPLE_HTTP_INTERNAL_Template_Node));
-              size_t size = strlen(value_c_str);
-              template_node->html = malloc(size);
-              memcpy(template_node->html, value_c_str, size);
-              template_node->html_size = size;
-              template_node->orig_end_idx = idx + 1;
+              string_part.size = strlen(value_c_str) + 1;
+              string_part.buf = malloc(string_part.size);
+              memcpy(string_part.buf, value_c_str, string_part.size);
+              string_part.buf[string_part.size - 1] = 0;
+              string_part.extra = idx + 1;
             }
           } else {
-            template_node =
-              malloc(sizeof(C_SIMPLE_HTTP_INTERNAL_Template_Node));
-            template_node->html = NULL;
-            template_node->html_size = 0;
-            template_node->orig_end_idx = idx + 1;
+            string_part.buf = NULL;
+            string_part.size = 0;
+            string_part.extra = idx + 1;
           }
-          simple_archiver_list_add(template_html_list, template_node,
-            c_simple_http_internal_free_template_node);
-          template_node = NULL;
+          c_simple_http_add_string_part(string_part_list,
+                                        string_part.buf,
+                                        string_part.extra);
+          free(string_part.buf);
         }
       } else {
         delimeter_count = 0;
@@ -300,48 +251,28 @@ char *c_simple_http_path_to_generated(
     }
   }
 
-  if (template_html_list->count != 0) {
-    C_SIMPLE_HTTP_INTERNAL_Template_Node *last_node =
-      template_html_list->tail->prev->data;
-    if (idx > last_node->orig_end_idx) {
-      template_node = malloc(sizeof(C_SIMPLE_HTTP_INTERNAL_Template_Node));
-      size_t size = idx - last_node->orig_end_idx;
-      template_node->html = malloc(size);
-      memcpy(template_node->html, html_buf + last_node->orig_end_idx, size);
-      template_node->html_size = size;
-      template_node->orig_end_idx = idx + 1;
-      simple_archiver_list_add(template_html_list, template_node,
-        c_simple_http_internal_free_template_node);
-      template_node = NULL;
+  if (string_part_list->count != 0) {
+    C_SIMPLE_HTTP_String_Part *last_part =
+      string_part_list->tail->prev->data;
+    if (idx > last_part->extra) {
+      string_part.size = idx - last_part->extra + 1;
+      string_part.buf = malloc(string_part.size);
+      memcpy(string_part.buf, html_buf + last_part->extra, string_part.size);
+      string_part.buf[string_part.size - 1] = 0;
+      string_part.extra = idx + 1;
+      c_simple_http_add_string_part(string_part_list,
+                                    string_part.buf,
+                                    string_part.extra);
+      free(string_part.buf);
 
-      last_node = template_html_list->tail->prev->data;
+      last_part = string_part_list->tail->prev->data;
     }
-    size_t final_size = 0;
-    simple_archiver_list_get(
-      template_html_list,
-      c_simple_http_internal_get_final_size_fn,
-      &final_size);
-    if (final_size == 0) {
-      fprintf(stderr, "ERROR final_size calculated as ZERO from templates!\n");
-      return NULL;
-    }
-    C_SIMPLE_HTTP_INTERNAL_Template_Node to_fill;
-    to_fill.html = malloc(final_size + 1);
-    to_fill.html_size = 0;
-    to_fill.html_capacity = final_size;
-    if (simple_archiver_list_get(
-        template_html_list,
-        c_simple_http_internal_fill_buf_fn,
-        &to_fill) != NULL) {
-      fprintf(stderr, "ERROR internal issue processing final html buffer!\n");
-      free(to_fill.html);
-      return NULL;
-    }
-    to_fill.html[final_size] = 0;
+
+    char *combined_buf = c_simple_http_combine_string_parts(string_part_list);
     if (output_buf_size) {
-      *output_buf_size = final_size;
+      *output_buf_size = strlen(combined_buf);
     }
-    return to_fill.html;
+    return combined_buf;
   } else {
     // Prevent cleanup fn from "free"ing html_buf and return it verbatim.
     char *buf = html_buf;
