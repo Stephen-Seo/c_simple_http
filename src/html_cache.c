@@ -77,7 +77,10 @@ char *c_simple_http_path_to_cache_filename(const char *path) {
   }
 
   if (prev_idx == 0) {
-    return stripped_path;
+    // Prevent string from being free'd by moving it to another variable.
+    char *temp = stripped_path;
+    stripped_path = NULL;
+    return temp;
   } else {
     return c_simple_http_combine_string_parts(parts);
   }
