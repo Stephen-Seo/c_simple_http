@@ -41,12 +41,23 @@ char *c_simple_http_path_to_cache_filename(const char *path) {
     return buf;
   }
 
+  // Check if path has "0x2F" inside of it to determine if delimeters will be
+  // "0x2F" or "%2F".
+  uint_fast8_t is_normal_delimeter = 1;
+  const size_t path_len = strlen(stripped_path);
+  for (size_t idx = 0; stripped_path[idx] != 0; ++idx) {
+    if (idx + 4 <= path_len && strncmp(stripped_path + idx, "0x2F", 4) == 0) {
+      is_normal_delimeter = 0;
+      break;
+    }
+  }
+
+  // Create the cache-filename piece by piece.
   __attribute__((cleanup(simple_archiver_list_free)))
   SDArchiverLinkedList *parts = simple_archiver_list_init();
 
   size_t idx = 0;
   size_t prev_idx = 0;
-  const size_t path_len = strlen(stripped_path);
   size_t size;
 
   for (; idx < path_len && stripped_path[idx] != 0; ++idx) {
@@ -58,10 +69,17 @@ char *c_simple_http_path_to_cache_filename(const char *path) {
       c_simple_http_add_string_part(parts, temp_buf, 0);
       free(temp_buf);
 
-      temp_buf = malloc(5);
-      memcpy(temp_buf, "0x2F", 5);
-      c_simple_http_add_string_part(parts, temp_buf, 0);
-      free(temp_buf);
+      if (is_normal_delimeter) {
+        temp_buf = malloc(5);
+        memcpy(temp_buf, "0x2F", 5);
+        c_simple_http_add_string_part(parts, temp_buf, 0);
+        free(temp_buf);
+      } else {
+        temp_buf = malloc(4);
+        memcpy(temp_buf, "%2F", 4);
+        c_simple_http_add_string_part(parts, temp_buf, 0);
+        free(temp_buf);
+      }
 
       prev_idx = idx + 1;
     }

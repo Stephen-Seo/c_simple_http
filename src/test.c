@@ -599,6 +599,23 @@ int main(void) {
     ret = c_simple_http_path_to_cache_filename("/outer///inner");
     CHECK_TRUE(strcmp(ret, "0x2Fouter0x2Finner") == 0);
     free(ret);
+
+    ret = c_simple_http_path_to_cache_filename("/outer/with_hex_0x2F_inner");
+    CHECK_TRUE(strcmp(ret, "%2Fouter%2Fwith_hex_0x2F_inner") == 0);
+    free(ret);
+
+    ret = c_simple_http_path_to_cache_filename("/outer/0x2F_hex_inner");
+    CHECK_TRUE(strcmp(ret, "%2Fouter%2F0x2F_hex_inner") == 0);
+    free(ret);
+
+    ret = c_simple_http_path_to_cache_filename("/outer0x2F/inner_hex_0x2F");
+    CHECK_TRUE(strcmp(ret, "%2Fouter0x2F%2Finner_hex_0x2F") == 0);
+    free(ret);
+
+    ret = c_simple_http_path_to_cache_filename(
+        "/0x2Fouter0x2F/0x2Finner_0x2F_hex_0x2F");
+    CHECK_TRUE(strcmp(ret, "%2F0x2Fouter0x2F%2F0x2Finner_0x2F_hex_0x2F") == 0);
+    free(ret);
   }
 
   RETURN()
