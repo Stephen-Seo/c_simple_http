@@ -9,6 +9,7 @@
 #include "helpers.h"
 #include "http_template.h"
 #include "http.h"
+#include "html_cache.h"
 
 // Third party includes.
 #include <SimpleArchiver/src/helpers.h>
@@ -308,7 +309,7 @@ int main(void) {
     buf = c_simple_http_path_to_generated(
         "/", &config, &output_buf_size, &filenames_list);
     ASSERT_TRUE(buf != NULL);
-    printf("%s\n", buf);
+    //printf("%s\n", buf);
     ASSERT_TRUE(
       strcmp(
         buf,
@@ -374,7 +375,7 @@ int main(void) {
     buf = c_simple_http_path_to_generated(
         "/", &config, &output_buf_size, &filenames_list);
     ASSERT_TRUE(buf != NULL);
-    printf("%s\n", buf);
+    //printf("%s\n", buf);
     ASSERT_TRUE(
       strcmp(
         buf,
@@ -465,7 +466,7 @@ int main(void) {
     buf = c_simple_http_path_to_generated(
         "/", &config, &output_buf_size, &filenames_list);
     ASSERT_TRUE(buf != NULL);
-    printf("%s\n", buf);
+    //printf("%s\n", buf);
     ASSERT_TRUE(
       strcmp(
         buf,
@@ -519,27 +520,38 @@ int main(void) {
     free(stripped_path_buf);
 
     stripped_path_buf = c_simple_http_strip_path("/someurl/", 9);
+    //printf("stripped path: %s\n", stripped_path_buf);
     CHECK_STREQ(stripped_path_buf, "/someurl");
     free(stripped_path_buf);
 
     stripped_path_buf = c_simple_http_strip_path("/someurl/////", 13);
+    //printf("stripped path: %s\n", stripped_path_buf);
     CHECK_STREQ(stripped_path_buf, "/someurl");
     free(stripped_path_buf);
 
     stripped_path_buf = c_simple_http_strip_path("/someurl?key=value", 18);
+    //printf("stripped path: %s\n", stripped_path_buf);
     CHECK_STREQ(stripped_path_buf, "/someurl");
     free(stripped_path_buf);
 
     stripped_path_buf = c_simple_http_strip_path("/someurl#client_data", 20);
+    //printf("stripped path: %s\n", stripped_path_buf);
     CHECK_STREQ(stripped_path_buf, "/someurl");
     free(stripped_path_buf);
 
     stripped_path_buf = c_simple_http_strip_path("/someurl////?key=value", 22);
+    //printf("stripped path: %s\n", stripped_path_buf);
     CHECK_STREQ(stripped_path_buf, "/someurl");
     free(stripped_path_buf);
 
     stripped_path_buf = c_simple_http_strip_path("/someurl///#client_data", 23);
+    //printf("stripped path: %s\n", stripped_path_buf);
     CHECK_STREQ(stripped_path_buf, "/someurl");
+    free(stripped_path_buf);
+
+    stripped_path_buf = c_simple_http_strip_path("/someurl/////inner", 18);
+    //printf("stripped path: %s\n", stripped_path_buf);
+    CHECK_STREQ(stripped_path_buf, "/someurl/inner");
     free(stripped_path_buf);
   }
 
@@ -556,6 +568,37 @@ int main(void) {
     char *buf = c_simple_http_combine_string_parts(list);
     ASSERT_TRUE(buf);
     ASSERT_TRUE(strcmp(buf, "one\ntwo\nthree\n") == 0);
+  }
+
+  // Test html_cache.
+  {
+    char *ret = c_simple_http_path_to_cache_filename("/");
+    CHECK_TRUE(strcmp(ret, "ROOT") == 0);
+    free(ret);
+
+    ret = c_simple_http_path_to_cache_filename("////");
+    CHECK_TRUE(strcmp(ret, "ROOT") == 0);
+    free(ret);
+
+    ret = c_simple_http_path_to_cache_filename("/inner");
+    CHECK_TRUE(strcmp(ret, "0x2Finner") == 0);
+    free(ret);
+
+    ret = c_simple_http_path_to_cache_filename("/inner////");
+    CHECK_TRUE(strcmp(ret, "0x2Finner") == 0);
+    free(ret);
+
+    ret = c_simple_http_path_to_cache_filename("/outer/inner");
+    CHECK_TRUE(strcmp(ret, "0x2Fouter0x2Finner") == 0);
+    free(ret);
+
+    ret = c_simple_http_path_to_cache_filename("/outer/inner////");
+    CHECK_TRUE(strcmp(ret, "0x2Fouter0x2Finner") == 0);
+    free(ret);
+
+    ret = c_simple_http_path_to_cache_filename("/outer///inner");
+    CHECK_TRUE(strcmp(ret, "0x2Fouter0x2Finner") == 0);
+    free(ret);
   }
 
   RETURN()

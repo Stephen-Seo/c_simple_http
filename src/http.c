@@ -23,8 +23,10 @@
 
 // Third party includes.
 #include <SimpleArchiver/src/helpers.h>
+#include <SimpleArchiver/src/data_structures/linked_list.h>
 
 // Local includes
+#include "SimpleArchiver/src/data_structures/priority_heap.h"
 #include "constants.h"
 #include "http_template.h"
 #include "helpers.h"
@@ -193,6 +195,14 @@ char *c_simple_http_request_response(
 }
 
 char *c_simple_http_strip_path(const char *path, size_t path_size) {
+  if (path_size == 1 && path[0] == '/') {
+    // Edge case: root path.
+    char *buf = malloc(2);
+    buf[0] = '/';
+    buf[1] = 0;
+    return buf;
+  }
+
   size_t idx = 0;
   for (; idx < path_size && path[idx] != 0; ++idx) {
     if (path[idx] == '?' || path[idx] == '#') {
@@ -204,7 +214,72 @@ char *c_simple_http_strip_path(const char *path, size_t path_size) {
   memcpy(stripped_path, path, idx);
   stripped_path[idx] = 0;
 
+  // Strip multiple '/' into one.
+  __attribute((cleanup(simple_archiver_list_free)))
+  SDArchiverLinkedList *parts = simple_archiver_list_init();
+
+  idx = 0;
+  size_t prev_idx = 0;
+  size_t size;
+  char *buf;
+  uint_fast8_t slash_visited = 0;
+
+  for (; stripped_path[idx] != 0; ++idx) {
+    if (stripped_path[idx] == '/') {
+      if (slash_visited) {
+        // Intentionally left blank.
+      } else {
+        slash_visited = 1;
+
+        if (idx > prev_idx) {
+          size = idx - prev_idx + 1;
+          buf = malloc(size);
+          memcpy(buf, stripped_path + prev_idx, size - 1);
+          buf[size - 1] = 0;
+
+          c_simple_http_add_string_part(parts, buf, 0);
+          free(buf);
+        }
+      }
+    } else {
+      if (slash_visited) {
+        buf = malloc(2);
+        buf[0] = '/';
+        buf[1] = 0;
+
+        c_simple_http_add_string_part(parts, buf, 0);
+        free(buf);
+
+        prev_idx = idx;
+      }
+
+      slash_visited = 0;
+    }
+  }
+
+  if (!slash_visited && idx > prev_idx) {
+    size = idx - prev_idx + 1;
+    buf = malloc(size);
+    memcpy(buf, stripped_path + prev_idx, size - 1);
+    buf[size - 1] = 0;
+
+    c_simple_http_add_string_part(parts, buf, 0);
+    free(buf);
+  } else if (slash_visited && prev_idx == 0) {
+    buf = malloc(2);
+    buf[0] = '/';
+    buf[1] = 0;
+
+    c_simple_http_add_string_part(parts, buf, 0);
+    free(buf);
+  }
+
+  free(stripped_path);
+
+  stripped_path = c_simple_http_combine_string_parts(parts);
+
   // Strip trailing '/'.
+  idx = strlen(stripped_path);
   while (idx-- > 1) {
     if (stripped_path[idx] == '/' || stripped_path[idx] == 0) {
       stripped_path[idx] = 0;
