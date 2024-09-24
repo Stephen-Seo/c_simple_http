@@ -25,7 +25,6 @@
 #include <SimpleArchiver/src/helpers.h>
 
 // Local includes
-#include "constants.h"
 #include "http_template.h"
 #include "helpers.h"
 
@@ -112,6 +111,13 @@ char *c_simple_http_request_response(
 #ifndef NDEBUG
   fprintf(stderr, "Parsing request: got path \"%s\"\n", request_path);
 #endif
+  __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
+  char *request_path_unescaped =
+    c_simple_http_helper_unescape_uri(request_path);
+#ifndef NDEBUG
+  fprintf(
+    stderr, "Parsing request: unescaped path \"%s\"\n", request_path_unescaped);
+#endif
   // skip whitespace until next part.
   for (; idx < size
       && (request[idx] == ' ' ||
@@ -158,9 +164,9 @@ char *c_simple_http_request_response(
   size_t generated_size = 0;
   __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
   char *stripped_path = c_simple_http_strip_path(
-    request_path, request_path_idx);
+    request_path_unescaped, strlen(request_path_unescaped));
   char *generated_buf = c_simple_http_path_to_generated(
-    stripped_path ? stripped_path : request_path,
+    stripped_path ? stripped_path : request_path_unescaped,
     templates,
     &generated_size);
 
@@ -171,8 +177,10 @@ char *c_simple_http_request_response(
       if (
           simple_archiver_hash_map_get(
             templates->hash_map,
-            stripped_path ? stripped_path : request_path,
-            stripped_path ? strlen(stripped_path) + 1 : request_path_idx + 1)
+            stripped_path ? stripped_path : request_path_unescaped,
+            stripped_path
+              ? strlen(stripped_path) + 1
+              : strlen(request_path_unescaped) + 1)
           == NULL) {
         *out_response_code = C_SIMPLE_HTTP_Response_404_Not_Found;
       } else {

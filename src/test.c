@@ -8,6 +8,7 @@
 #include "config.h"
 #include "http_template.h"
 #include "http.h"
+#include "helpers.h"
 
 // Third party includes.
 #include <SimpleArchiver/src/helpers.h>
@@ -501,6 +502,46 @@ int main(void) {
     stripped_path_buf = c_simple_http_strip_path("/someurl///#client_data", 23);
     CHECK_STREQ(stripped_path_buf, "/someurl");
     free(stripped_path_buf);
+  }
+
+  // Test helpers.
+  {
+    __attribute__((cleanup(simple_archiver_list_free)))
+    SDArchiverLinkedList *list = simple_archiver_list_init();
+
+    c_simple_http_add_string_part(list, "one\n", 0);
+    c_simple_http_add_string_part(list, "two\n", 0);
+    c_simple_http_add_string_part(list, "three\n", 0);
+
+    __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
+    char *buf = c_simple_http_combine_string_parts(list);
+    ASSERT_TRUE(buf);
+    ASSERT_TRUE(strcmp(buf, "one\ntwo\nthree\n") == 0);
+    free(buf);
+    buf = NULL;
+
+    char hex_result = c_simple_http_helper_hex_to_value('2', 'f');
+    CHECK_TRUE(hex_result == '/');
+    hex_result = c_simple_http_helper_hex_to_value('2', 'F');
+    CHECK_TRUE(hex_result == '/');
+
+    hex_result = c_simple_http_helper_hex_to_value('7', 'a');
+    CHECK_TRUE(hex_result == 'z');
+    hex_result = c_simple_http_helper_hex_to_value('7', 'A');
+    CHECK_TRUE(hex_result == 'z');
+
+    hex_result = c_simple_http_helper_hex_to_value('4', '1');
+    CHECK_TRUE(hex_result == 'A');
+
+    buf = c_simple_http_helper_unescape_uri("%2fderp%2Fdoop%21");
+    CHECK_TRUE(strcmp(buf, "/derp/doop!") == 0);
+    free(buf);
+    buf = NULL;
+
+    buf = c_simple_http_helper_unescape_uri("%41%42%43%25%5A%5a");
+    CHECK_TRUE(strcmp(buf, "ABC%ZZ") == 0);
+    free(buf);
+    buf = NULL;
   }
 
   RETURN()
