@@ -568,6 +568,31 @@ int main(void) {
     char *buf = c_simple_http_combine_string_parts(list);
     ASSERT_TRUE(buf);
     ASSERT_TRUE(strcmp(buf, "one\ntwo\nthree\n") == 0);
+    free(buf);
+    buf = NULL;
+
+    char hex_result = c_simple_http_helper_hex_to_value('2', 'f');
+    CHECK_TRUE(hex_result == '/');
+    hex_result = c_simple_http_helper_hex_to_value('2', 'F');
+    CHECK_TRUE(hex_result == '/');
+
+    hex_result = c_simple_http_helper_hex_to_value('7', 'a');
+    CHECK_TRUE(hex_result == 'z');
+    hex_result = c_simple_http_helper_hex_to_value('7', 'A');
+    CHECK_TRUE(hex_result == 'z');
+
+    hex_result = c_simple_http_helper_hex_to_value('4', '1');
+    CHECK_TRUE(hex_result == 'A');
+
+    buf = c_simple_http_helper_unescape_uri("%2fderp%2Fdoop%21");
+    CHECK_TRUE(strcmp(buf, "/derp/doop!") == 0);
+    free(buf);
+    buf = NULL;
+
+    buf = c_simple_http_helper_unescape_uri("%41%42%43%25%5A%5a");
+    CHECK_TRUE(strcmp(buf, "ABC%ZZ") == 0);
+    free(buf);
+    buf = NULL;
   }
 
   // Test html_cache.

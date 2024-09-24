@@ -50,6 +50,13 @@ void c_simple_http_helper_to_lowercase_in_place(char *buf, size_t size);
 /// uppercase to lowercase alpha chars.
 char *c_simple_http_helper_to_lowercase(const char *buf, size_t size);
 
+/// Converts two hexadecimal digits into its corresponding value.
+char c_simple_http_helper_hex_to_value(const char upper, const char lower);
+
+/// Unescapes percent-encoded parts in the given uri string. If this returns
+/// non-NULL, it must be free'd.
+char *c_simple_http_helper_unescape_uri(const char *uri);
+
 #endif
 
 // vim: et ts=2 sts=2 sw=2

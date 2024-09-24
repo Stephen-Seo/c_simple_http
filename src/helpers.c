@@ -144,4 +144,76 @@ char *c_simple_http_helper_to_lowercase(const char *buf, size_t size) {
   return ret_buf;
 }
 
+char c_simple_http_helper_hex_to_value(const char upper, const char lower) {
+  char result = 0;
+
+  if (upper >= '0' && upper <= '9') {
+    result |= (char)(upper - '0') << 4;
+  } else if (upper >= 'a' && upper <= 'f') {
+    result |= (char)(upper - 'a' + 10) << 4;
+  } else if (upper >= 'A' && upper <= 'F') {
+    result |= (char)(upper - 'A' + 10) << 4;
+  } else {
+    return 0;
+  }
+
+  if (lower >= '0' && lower <= '9') {
+    result |= lower - '0';
+  } else if (lower >= 'a' && lower <= 'f') {
+    result |= lower - 'a' + 10;
+  } else if (lower >= 'A' && lower <= 'F') {
+    result |= lower - 'A' + 10;
+  } else {
+    return 0;
+  }
+
+  return result;
+}
+
+char *c_simple_http_helper_unescape_uri(const char *uri) {
+  __attribute__((cleanup(simple_archiver_list_free)))
+  SDArchiverLinkedList *parts = simple_archiver_list_init();
+
+  const size_t size = strlen(uri);
+  size_t idx = 0;
+  size_t prev_idx = 0;
+  size_t buf_size;
+  char *buf;
+
+  for (; idx <= size; ++idx) {
+    if (uri[idx] == '%' && idx + 2 < size) {
+      if (idx > prev_idx) {
+        buf_size = idx - prev_idx + 1;
+        buf = malloc(buf_size);
+        memcpy(buf, uri + prev_idx, buf_size - 1);
+        buf[buf_size - 1] = 0;
+        c_simple_http_add_string_part(parts, buf, 0);
+        free(buf);
+      }
+      buf = malloc(2);
+      buf[0] = c_simple_http_helper_hex_to_value(uri[idx + 1], uri[idx + 2]);
+      buf[1] = 0;
+      if (buf[0] == 0) {
+        free(buf);
+        return NULL;
+      }
+      c_simple_http_add_string_part(parts, buf, 0);
+      free(buf);
+      prev_idx = idx + 3;
+      idx += 2;
+    }
+  }
+
+  if (idx > prev_idx) {
+    buf_size = idx - prev_idx + 1;
+    buf = malloc(buf_size);
+    memcpy(buf, uri + prev_idx, buf_size - 1);
+    buf[buf_size - 1] = 0;
+    c_simple_http_add_string_part(parts, buf, 0);
+    free(buf);
+  }
+
+  return c_simple_http_combine_string_parts(parts);
+}
+
 // vim: et ts=2 sts=2 sw=2
