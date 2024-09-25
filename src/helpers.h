@@ -19,6 +19,7 @@
 
 // Standard library includes.
 #include <stddef.h>
+#include <stdint.h>
 
 // Third-party includes.
 #include <SimpleArchiver/src/data_structures/linked_list.h>
@@ -26,7 +27,7 @@
 typedef struct C_SIMPLE_HTTP_String_Part {
   char *buf;
   size_t size;
-  size_t extra;
+  uintptr_t extra;
 } C_SIMPLE_HTTP_String_Part;
 
 void c_simple_http_cleanup_attr_string_part(C_SIMPLE_HTTP_String_Part **);
