@@ -598,49 +598,129 @@ int main(void) {
   // Test html_cache.
   {
     char *ret = c_simple_http_path_to_cache_filename("/");
+    ASSERT_TRUE(ret);
     CHECK_TRUE(strcmp(ret, "ROOT") == 0);
     free(ret);
 
     ret = c_simple_http_path_to_cache_filename("////");
+    ASSERT_TRUE(ret);
     CHECK_TRUE(strcmp(ret, "ROOT") == 0);
     free(ret);
 
     ret = c_simple_http_path_to_cache_filename("/inner");
+    ASSERT_TRUE(ret);
     CHECK_TRUE(strcmp(ret, "0x2Finner") == 0);
     free(ret);
 
     ret = c_simple_http_path_to_cache_filename("/inner////");
+    ASSERT_TRUE(ret);
     CHECK_TRUE(strcmp(ret, "0x2Finner") == 0);
     free(ret);
 
     ret = c_simple_http_path_to_cache_filename("/outer/inner");
+    ASSERT_TRUE(ret);
     CHECK_TRUE(strcmp(ret, "0x2Fouter0x2Finner") == 0);
     free(ret);
 
     ret = c_simple_http_path_to_cache_filename("/outer/inner////");
+    ASSERT_TRUE(ret);
     CHECK_TRUE(strcmp(ret, "0x2Fouter0x2Finner") == 0);
     free(ret);
 
     ret = c_simple_http_path_to_cache_filename("/outer///inner");
+    ASSERT_TRUE(ret);
     CHECK_TRUE(strcmp(ret, "0x2Fouter0x2Finner") == 0);
     free(ret);
 
     ret = c_simple_http_path_to_cache_filename("/outer/with_hex_0x2F_inner");
+    ASSERT_TRUE(ret);
     CHECK_TRUE(strcmp(ret, "%2Fouter%2Fwith_hex_0x2F_inner") == 0);
     free(ret);
 
     ret = c_simple_http_path_to_cache_filename("/outer/0x2F_hex_inner");
+    ASSERT_TRUE(ret);
     CHECK_TRUE(strcmp(ret, "%2Fouter%2F0x2F_hex_inner") == 0);
     free(ret);
 
     ret = c_simple_http_path_to_cache_filename("/outer0x2F/inner_hex_0x2F");
+    ASSERT_TRUE(ret);
     CHECK_TRUE(strcmp(ret, "%2Fouter0x2F%2Finner_hex_0x2F") == 0);
     free(ret);
 
     ret = c_simple_http_path_to_cache_filename(
         "/0x2Fouter0x2F/0x2Finner_0x2F_hex_0x2F");
+    ASSERT_TRUE(ret);
     CHECK_TRUE(strcmp(ret, "%2F0x2Fouter0x2F%2F0x2Finner_0x2F_hex_0x2F") == 0);
     free(ret);
+
+    ret = c_simple_http_cache_filename_to_path("0x2Fouter0x2Finner");
+    ASSERT_TRUE(ret);
+    printf("%s\n", ret);
+    CHECK_TRUE(strcmp(ret, "/outer/inner") == 0);
+    free(ret);
+
+    ret = c_simple_http_cache_filename_to_path("0x2Fouter0x2Finner0x2F%2F0x2Fmore_inner");
+    ASSERT_TRUE(ret);
+    CHECK_TRUE(strcmp(ret, "/outer/inner/%2F/more_inner") == 0);
+    free(ret);
+
+    ret = c_simple_http_cache_filename_to_path("%2Fouter%2Finner");
+    ASSERT_TRUE(ret);
+    CHECK_TRUE(strcmp(ret, "/outer/inner") == 0);
+    free(ret);
+
+    ret = c_simple_http_cache_filename_to_path("%2Fouter%2Finner%2F0x2F%2Fmore_inner");
+    ASSERT_TRUE(ret);
+    CHECK_TRUE(strcmp(ret, "/outer/inner/0x2F/more_inner") == 0);
+    free(ret);
+
+    const char *uri0 = "/a/simple/url/with/inner/paths";
+    ret =
+      c_simple_http_path_to_cache_filename(uri0);
+    ASSERT_TRUE(ret);
+    CHECK_TRUE(
+      strcmp(ret, "0x2Fa0x2Fsimple0x2Furl0x2Fwith0x2Finner0x2Fpaths")
+      == 0);
+    char *ret2 = c_simple_http_cache_filename_to_path(ret);
+    free(ret);
+    ASSERT_TRUE(ret2);
+    CHECK_TRUE(strcmp(ret2, uri0) == 0);
+    free(ret2);
+
+    const char *uri1 = "/a/url/with/0x2F/in/it";
+    ret =
+      c_simple_http_path_to_cache_filename(uri1);
+    ASSERT_TRUE(ret);
+    CHECK_TRUE(
+      strcmp(ret, "%2Fa%2Furl%2Fwith%2F0x2F%2Fin%2Fit")
+      == 0);
+    ret2 = c_simple_http_cache_filename_to_path(ret);
+    free(ret);
+    ASSERT_TRUE(ret2);
+    CHECK_TRUE(strcmp(ret2, uri1) == 0);
+    free(ret2);
+
+    const char *uri2 = "/";
+    ret =
+      c_simple_http_path_to_cache_filename(uri2);
+    ASSERT_TRUE(ret);
+    CHECK_TRUE(strcmp(ret, "ROOT") == 0);
+    ret2 = c_simple_http_cache_filename_to_path(ret);
+    free(ret);
+    ASSERT_TRUE(ret2);
+    CHECK_TRUE(strcmp(ret2, uri2) == 0);
+    free(ret2);
+
+    const char *uri3 = "/a";
+    ret =
+      c_simple_http_path_to_cache_filename(uri3);
+    ASSERT_TRUE(ret);
+    CHECK_TRUE(strcmp(ret, "0x2Fa") == 0);
+    ret2 = c_simple_http_cache_filename_to_path(ret);
+    free(ret);
+    ASSERT_TRUE(ret2);
+    CHECK_TRUE(strcmp(ret2, uri3) == 0);
+    free(ret2);
   }
 
   RETURN()
