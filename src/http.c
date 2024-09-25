@@ -28,6 +28,7 @@
 // Local includes
 #include "http_template.h"
 #include "helpers.h"
+#include "html_cache.h"
 
 #define REQUEST_TYPE_BUFFER_SIZE 16
 #define REQUEST_PATH_BUFFER_SIZE 256
@@ -63,7 +64,9 @@ char *c_simple_http_request_response(
     uint32_t size,
     const C_SIMPLE_HTTP_HTTPTemplates *templates,
     size_t *out_size,
-    enum C_SIMPLE_HTTP_ResponseCode *out_response_code) {
+    enum C_SIMPLE_HTTP_ResponseCode *out_response_code,
+    const char *cache_dir,
+    const char *config_filename) {
   if (out_size) {
     *out_size = 0;
   }
@@ -171,11 +174,42 @@ char *c_simple_http_request_response(
   __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
   char *stripped_path = c_simple_http_strip_path(
     request_path_unescaped, strlen(request_path_unescaped));
-  char *generated_buf = c_simple_http_path_to_generated(
-    stripped_path ? stripped_path : request_path_unescaped,
-    templates,
-    &generated_size,
-    NULL); // TODO Use the output parameter "filenames list" here.
+
+  char *generated_buf = NULL;
+
+  if (cache_dir) {
+    int ret = c_simple_http_cache_path(
+      stripped_path ? stripped_path : request_path_unescaped,
+      config_filename,
+      cache_dir,
+      templates,
+      &generated_buf);
+    if (ret < 0) {
+      fprintf(stderr, "ERROR Failed to generate template with cache!\n");
+      if (out_response_code) {
+        if (
+            simple_archiver_hash_map_get(
+              templates->hash_map,
+              stripped_path ? stripped_path : request_path_unescaped,
+              stripped_path
+                ? strlen(stripped_path) + 1
+                : strlen(request_path_unescaped) + 1)
+            == NULL) {
+          *out_response_code = C_SIMPLE_HTTP_Response_404_Not_Found;
+        } else {
+          *out_response_code = C_SIMPLE_HTTP_Response_500_Internal_Server_Error;
+        }
+      }
+      return NULL;
+    }
+    generated_size = strlen(generated_buf);
+  } else {
+    generated_buf = c_simple_http_path_to_generated(
+      stripped_path ? stripped_path : request_path_unescaped,
+      templates,
+      &generated_size,
+      NULL);
+  }
 
   if (!generated_buf || generated_size == 0) {
     fprintf(stderr, "ERROR Unable to generate response html for path \"%s\"!\n",

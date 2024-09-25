@@ -17,21 +17,26 @@
 #ifndef SEODISPARATE_COM_C_SIMPLE_HTTP_HTML_CACHE_H_
 #define SEODISPARATE_COM_C_SIMPLE_HTTP_HTML_CACHE_H_
 
+// Local includes.
+#include "http.h"
+
 /// Must be free'd if non-NULL.
 char *c_simple_http_path_to_cache_filename(const char *path);
 
 /// Must be free'd if non-NULL.
 char *c_simple_http_cache_filename_to_path(const char *cache_filename);
 
-/// Given a "path", returns non-zero if the cache is invalidated.
+/// Given a "path", returns positive-non-zero if the cache is invalidated.
 /// "config_filename" is required to check its timestamp. "cache_dir" is
 /// required to actually get the cache file to check against. "buf_out" will be
 /// populated if non-NULL, and will either be fetched from the cache or from the
 /// config (using http_template). Note that "buf_out" will point to a c-string.
+/// Returns a negative value on error.
 int c_simple_http_cache_path(
   const char *path,
   const char *config_filename,
   const char *cache_dir,
+  const C_SIMPLE_HTTP_HTTPTemplates *templates,
   char **buf_out);
 
 #endif

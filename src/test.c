@@ -4,6 +4,11 @@
 #include <stdlib.h>
 #include <stdint.h>
 
+// POSIX includes.
+#include <unistd.h>
+#include <sys/types.h>
+#include <dirent.h>
+
 // Local includes.
 #include "config.h"
 #include "helpers.h"
@@ -593,6 +598,19 @@ int main(void) {
     CHECK_TRUE(strcmp(buf, "ABC%ZZ") == 0);
     free(buf);
     buf = NULL;
+
+    DIR *dirp = opendir("/tmp/create_dirs_dir");
+    uint_fast8_t dir_exists = dirp ? 1 : 0;
+    closedir(dirp);
+    ASSERT_FALSE(dir_exists);
+
+    int ret = c_simple_http_helper_mkdir_tree("/tmp/create_dirs_dir/dir/");
+    int ret2 = rmdir("/tmp/create_dirs_dir/dir");
+    int ret3 = rmdir("/tmp/create_dirs_dir");
+
+    CHECK_TRUE(ret == 0);
+    CHECK_TRUE(ret2 == 0);
+    CHECK_TRUE(ret3 == 0);
   }
 
   // Test html_cache.
@@ -655,11 +673,11 @@ int main(void) {
 
     ret = c_simple_http_cache_filename_to_path("0x2Fouter0x2Finner");
     ASSERT_TRUE(ret);
-    printf("%s\n", ret);
     CHECK_TRUE(strcmp(ret, "/outer/inner") == 0);
     free(ret);
 
-    ret = c_simple_http_cache_filename_to_path("0x2Fouter0x2Finner0x2F%2F0x2Fmore_inner");
+    ret = c_simple_http_cache_filename_to_path(
+      "0x2Fouter0x2Finner0x2F%2F0x2Fmore_inner");
     ASSERT_TRUE(ret);
     CHECK_TRUE(strcmp(ret, "/outer/inner/%2F/more_inner") == 0);
     free(ret);
@@ -669,7 +687,8 @@ int main(void) {
     CHECK_TRUE(strcmp(ret, "/outer/inner") == 0);
     free(ret);
 
-    ret = c_simple_http_cache_filename_to_path("%2Fouter%2Finner%2F0x2F%2Fmore_inner");
+    ret = c_simple_http_cache_filename_to_path(
+      "%2Fouter%2Finner%2F0x2F%2Fmore_inner");
     ASSERT_TRUE(ret);
     CHECK_TRUE(strcmp(ret, "/outer/inner/0x2F/more_inner") == 0);
     free(ret);
@@ -721,6 +740,172 @@ int main(void) {
     ASSERT_TRUE(ret2);
     CHECK_TRUE(strcmp(ret2, uri3) == 0);
     free(ret2);
+
+    // Set up test config to get template map to test cache.
+    __attribute__((cleanup(test_internal_cleanup_delete_temporary_file)))
+    const char *test_http_template_filename5 =
+      "/tmp/c_simple_http_template_test5.config";
+    __attribute__((cleanup(test_internal_cleanup_delete_temporary_file)))
+    const char *test_http_template_html_filename3 =
+      "/tmp/c_simple_http_template_test3.html";
+    __attribute__((cleanup(test_internal_cleanup_delete_temporary_file)))
+    const char *test_http_template_html_var_filename2 =
+      "/tmp/c_simple_http_template_test_var2.html";
+
+    FILE *test_file = fopen(test_http_template_filename5, "w");
+    ASSERT_TRUE(test_file);
+
+    ASSERT_TRUE(
+      fwrite(
+        "PATH=/\nHTML_FILE=/tmp/c_simple_http_template_test3.html\n",
+        1,
+        56,
+        test_file)
+      == 56);
+    ASSERT_TRUE(
+      fwrite(
+        "VAR_FILE=/tmp/c_simple_http_template_test_var2.html\n",
+        1,
+        52,
+        test_file)
+      == 52);
+    fclose(test_file);
+
+    test_file = fopen(test_http_template_html_filename3, "w");
+    ASSERT_TRUE(test_file);
+
+    ASSERT_TRUE(
+      fwrite(
+        "<body>{{{VAR_FILE}}}</body>\n",
+        1,
+        28,
+        test_file)
+      == 28);
+    fclose(test_file);
+
+    test_file = fopen(test_http_template_html_var_filename2, "w");
+    ASSERT_TRUE(test_file);
+
+    ASSERT_TRUE(
+      fwrite(
+        "Some test text.<br>Yep.",
+        1,
+        23,
+        test_file)
+      == 23);
+    fclose(test_file);
+
+    __attribute__((cleanup(c_simple_http_clean_up_parsed_config)))
+    C_SIMPLE_HTTP_ParsedConfig templates =
+      c_simple_http_parse_config(test_http_template_filename5, "PATH", NULL);
+    ASSERT_TRUE(templates.paths);
+
+    // Run cache function. Should return >0 due to new/first cache entry.
+    __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
+    char *buf = NULL;
+    int int_ret = c_simple_http_cache_path(
+      "/",
+      test_http_template_filename5,
+      "/tmp/c_simple_http_cache_dir",
+      &templates,
+      &buf);
+
+    CHECK_TRUE(int_ret > 0);
+    ASSERT_TRUE(buf);
+    CHECK_TRUE(strcmp(buf, "<body>Some test text.<br>Yep.</body>\n") == 0);
+    free(buf);
+    buf = NULL;
+
+    // Check/get size of cache file.
+    FILE *cache_file = fopen("/tmp/c_simple_http_cache_dir/ROOT", "r");
+    uint_fast8_t cache_file_exists = cache_file ? 1 : 0;
+    fseek(cache_file, 0, SEEK_END);
+    const long cache_file_size_0 = ftell(cache_file);
+    fclose(cache_file);
+    ASSERT_TRUE(cache_file_exists);
+
+    // Re-run cache function, checking that it is not invalidated.
+    int_ret = c_simple_http_cache_path(
+      "/",
+      test_http_template_filename5,
+      "/tmp/c_simple_http_cache_dir",
+      &templates,
+      &buf);
+    CHECK_TRUE(int_ret == 0);
+    ASSERT_TRUE(buf);
+    CHECK_TRUE(strcmp(buf, "<body>Some test text.<br>Yep.</body>\n") == 0);
+    free(buf);
+    buf = NULL;
+
+    // Check/get size of cache file.
+    cache_file = fopen("/tmp/c_simple_http_cache_dir/ROOT", "r");
+    cache_file_exists = cache_file ? 1 : 0;
+    fseek(cache_file, 0, SEEK_END);
+    const long cache_file_size_1 = ftell(cache_file);
+    fclose(cache_file);
+    ASSERT_TRUE(cache_file_exists);
+    CHECK_TRUE(cache_file_size_0 == cache_file_size_1);
+
+    // Change a file used by the template for PATH=/ .
+    test_file = fopen(test_http_template_html_var_filename2, "w");
+    ASSERT_TRUE(test_file);
+
+    ASSERT_TRUE(
+      fwrite(
+        "Alternate test text.<br>Yep.",
+        1,
+        28,
+        test_file)
+      == 28);
+    fclose(test_file);
+
+    // Re-run cache function, checking that it is invalidated.
+    int_ret = c_simple_http_cache_path(
+      "/",
+      test_http_template_filename5,
+      "/tmp/c_simple_http_cache_dir",
+      &templates,
+      &buf);
+    CHECK_TRUE(int_ret > 0);
+    ASSERT_TRUE(buf);
+    CHECK_TRUE(strcmp(buf, "<body>Alternate test text.<br>Yep.</body>\n") == 0);
+    free(buf);
+    buf = NULL;
+
+    // Get/check size of cache file.
+    cache_file = fopen("/tmp/c_simple_http_cache_dir/ROOT", "r");
+    cache_file_exists = cache_file ? 1 : 0;
+    fseek(cache_file, 0, SEEK_END);
+    const long cache_file_size_2 = ftell(cache_file);
+    fclose(cache_file);
+    ASSERT_TRUE(cache_file_exists);
+    CHECK_TRUE(cache_file_size_0 != cache_file_size_2);
+
+    // Re-run cache function, checking that it is not invalidated.
+    int_ret = c_simple_http_cache_path(
+      "/",
+      test_http_template_filename5,
+      "/tmp/c_simple_http_cache_dir",
+      &templates,
+      &buf);
+    CHECK_TRUE(int_ret == 0);
+    ASSERT_TRUE(buf);
+    CHECK_TRUE(strcmp(buf, "<body>Alternate test text.<br>Yep.</body>\n") == 0);
+    free(buf);
+    buf = NULL;
+
+    // Get/check size of cache file.
+    cache_file = fopen("/tmp/c_simple_http_cache_dir/ROOT", "r");
+    cache_file_exists = cache_file ? 1 : 0;
+    fseek(cache_file, 0, SEEK_END);
+    const long cache_file_size_3 = ftell(cache_file);
+    fclose(cache_file);
+    ASSERT_TRUE(cache_file_exists);
+    CHECK_TRUE(cache_file_size_2 == cache_file_size_3);
+
+    // Cleanup.
+    remove("/tmp/c_simple_http_cache_dir/ROOT");
+    rmdir("/tmp/c_simple_http_cache_dir");
   }
 
   RETURN()

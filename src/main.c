@@ -359,7 +359,9 @@ int main(int argc, char **argv) {
         (uint32_t)read_ret,
         &parsed_config,
         &response_size,
-        &response_code);
+        &response_code,
+        args.cache_dir,
+        args.config_file);
       if (response && response_code == C_SIMPLE_HTTP_Response_200_OK) {
         CHECK_ERROR_WRITE(write(connection_fd, "HTTP/1.1 200 OK\n", 16));
         CHECK_ERROR_WRITE(write(connection_fd, "Allow: GET\n", 11));

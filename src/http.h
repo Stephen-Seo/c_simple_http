@@ -48,7 +48,9 @@ char *c_simple_http_request_response(
   uint32_t size,
   const C_SIMPLE_HTTP_HTTPTemplates *templates,
   size_t *out_size,
-  enum C_SIMPLE_HTTP_ResponseCode *out_response_code
+  enum C_SIMPLE_HTTP_ResponseCode *out_response_code,
+  const char *cache_dir,
+  const char *config_filename
 );
 
 /// Takes a PATH string and returns a "bare" path.

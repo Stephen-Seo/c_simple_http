@@ -21,6 +21,13 @@
 #include <string.h>
 #include <stdio.h>
 
+// libc includes.
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <dirent.h>
+#include <errno.h>
+#include <libgen.h>
+
 int c_simple_http_internal_get_string_part_full_size(void *data, void *ud) {
   C_SIMPLE_HTTP_String_Part *part = data;
   size_t *count = ud;
@@ -214,6 +221,44 @@ char *c_simple_http_helper_unescape_uri(const char *uri) {
   }
 
   return c_simple_http_combine_string_parts(parts);
+}
+
+int c_simple_http_helper_mkdir_tree(const char *path) {
+  // Check if dir already exists.
+  DIR *dir_ptr = opendir(path);
+  if (dir_ptr) {
+    // Directory already exists.
+    closedir(dir_ptr);
+    return 1;
+  } else if (errno == ENOENT) {
+    // Directory doesn't exist, create dir tree.
+    closedir(dir_ptr);
+
+    size_t buf_size = strlen(path) + 1;
+    char *buf = malloc(buf_size);
+    memcpy(buf, path, buf_size - 1);
+    buf[buf_size - 1] = 0;
+
+    char *dirname_buf = dirname(buf);
+    // Recursive call to ensure parent directories are created.
+    int ret = c_simple_http_helper_mkdir_tree(dirname_buf);
+    free(buf);
+    if (ret == 1 || ret == 0) {
+      // Parent directory should be created by now.
+      ret = mkdir(path, S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
+      if (ret != 0) {
+        return 4;
+      }
+    } else {
+      return 3;
+    }
+
+    return 0;
+  } else {
+    // Other directory error.
+    closedir(dir_ptr);
+    return 2;
+  }
 }
 
 // vim: et ts=2 sts=2 sw=2
