@@ -76,7 +76,7 @@ void c_simple_http_cleanup_string_part(void *data) {
 }
 
 void c_simple_http_add_string_part(
-    SDArchiverLinkedList *list, const char *c_string, size_t extra) {
+    SDArchiverLinkedList *list, const char *c_string, uintptr_t extra) {
   C_SIMPLE_HTTP_String_Part *string_part =
     malloc(sizeof(C_SIMPLE_HTTP_String_Part));
 

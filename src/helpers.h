@@ -39,7 +39,7 @@ void c_simple_http_cleanup_string_part(void *data);
 /// Puts a malloced instance of String_Part into the list.
 /// The given c_string will be copied into a newly malloced buffer.
 void c_simple_http_add_string_part(
-  SDArchiverLinkedList *list, const char *c_string, size_t extra);
+  SDArchiverLinkedList *list, const char *c_string, uintptr_t extra);
 
 /// Combines all String_Parts in the list and returns it as a single buffer.
 char *c_simple_http_combine_string_parts(const SDArchiverLinkedList *list);
