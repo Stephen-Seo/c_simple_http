@@ -847,6 +847,11 @@ int main(void) {
     CHECK_TRUE(cache_file_size_0 == cache_file_size_1);
 
     // Change a file used by the template for PATH=/ .
+    // Sleep first since granularity is by the second.
+    puts("Sleeping for two seconds to ensure edited file's timestamp has "
+      "changed...");
+    sleep(2);
+    puts("Done sleeping.");
     test_file = fopen(test_http_template_html_var_filename2, "w");
     ASSERT_TRUE(test_file);
 
