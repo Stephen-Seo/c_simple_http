@@ -52,3 +52,7 @@ Without this, the project will fail to build.
 The config file can be reloaded if the program receives the SIGUSR1 signal.  
 The `--enable-reload-config-on-change` option automatically reloads the config
 file if the config file has changed.
+
+The `--enable-cache-dir=<DIR>` option enables caching and sets the "cache-dir"
+at the same time. `--cache-entry-lifetime-seconds=<SECONDS>` determines when a
+cache entry expires.
