@@ -25,6 +25,9 @@
 #include <sys/stat.h>
 #include <errno.h>
 
+// libc includes.
+#include <time.h>
+
 // Third-party includes.
 #include <SimpleArchiver/src/data_structures/linked_list.h>
 #include <SimpleArchiver/src/data_structures/hash_map.h>
@@ -208,6 +211,7 @@ int c_simple_http_cache_path(
     const char *config_filename,
     const char *cache_dir,
     C_SIMPLE_HTTP_HTTPTemplates *templates,
+    size_t cache_entry_lifespan,
     char **buf_out) {
   if (!path) {
     fprintf(stderr, "ERROR cache_path function: path is NULL!\n");
@@ -391,11 +395,17 @@ int c_simple_http_cache_path(
   }
 
   // Compare modification times.
+  struct timespec current_time;
+  if (clock_gettime(CLOCK_REALTIME, &current_time) != 0) {
+    memset(&current_time, 0, sizeof(struct timespec));
+  }
 CACHE_FILE_WRITE_CHECK:
   if (force_cache_update
       || cache_file_stat.st_mtim.tv_sec < config_file_stat.st_mtim.tv_sec
       || (cache_file_stat.st_mtim.tv_sec == config_file_stat.st_mtim.tv_sec
-         && cache_file_stat.st_mtim.tv_nsec < config_file_stat.st_mtim.tv_nsec))
+         && cache_file_stat.st_mtim.tv_nsec < config_file_stat.st_mtim.tv_nsec)
+      || (current_time.tv_sec - cache_file_stat.st_mtim.tv_sec
+         > (ssize_t)cache_entry_lifespan))
   {
     // Cache file is out of date.
 

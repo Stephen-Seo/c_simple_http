@@ -65,8 +65,7 @@ char *c_simple_http_request_response(
     C_SIMPLE_HTTP_HTTPTemplates *templates,
     size_t *out_size,
     enum C_SIMPLE_HTTP_ResponseCode *out_response_code,
-    const char *cache_dir,
-    const char *config_filename) {
+    const Args *args) {
   if (out_size) {
     *out_size = 0;
   }
@@ -177,12 +176,13 @@ char *c_simple_http_request_response(
 
   char *generated_buf = NULL;
 
-  if (cache_dir) {
+  if (args->cache_dir) {
     int ret = c_simple_http_cache_path(
       stripped_path ? stripped_path : request_path_unescaped,
-      config_filename,
-      cache_dir,
+      args->config_file,
+      args->cache_dir,
       templates,
+      args->cache_lifespan_seconds,
       &generated_buf);
     if (ret < 0) {
       fprintf(stderr, "ERROR Failed to generate template with cache!\n");

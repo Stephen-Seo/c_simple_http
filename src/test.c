@@ -15,6 +15,7 @@
 #include "http_template.h"
 #include "http.h"
 #include "html_cache.h"
+#include "constants.h"
 
 // Third party includes.
 #include <SimpleArchiver/src/helpers.h>
@@ -808,6 +809,7 @@ int main(void) {
       test_http_template_filename5,
       "/tmp/c_simple_http_cache_dir",
       &templates,
+      0xFFFFFFFF,
       &buf);
 
     CHECK_TRUE(int_ret > 0);
@@ -830,6 +832,7 @@ int main(void) {
       test_http_template_filename5,
       "/tmp/c_simple_http_cache_dir",
       &templates,
+      0xFFFFFFFF,
       &buf);
     CHECK_TRUE(int_ret == 0);
     ASSERT_TRUE(buf);
@@ -870,6 +873,7 @@ int main(void) {
       test_http_template_filename5,
       "/tmp/c_simple_http_cache_dir",
       &templates,
+      0xFFFFFFFF,
       &buf);
     CHECK_TRUE(int_ret > 0);
     ASSERT_TRUE(buf);
@@ -892,6 +896,7 @@ int main(void) {
       test_http_template_filename5,
       "/tmp/c_simple_http_cache_dir",
       &templates,
+      0xFFFFFFFF,
       &buf);
     CHECK_TRUE(int_ret == 0);
     ASSERT_TRUE(buf);
@@ -909,6 +914,10 @@ int main(void) {
     CHECK_TRUE(cache_file_size_2 == cache_file_size_3);
 
     // Edit config file.
+    puts("Sleeping for two seconds to ensure edited file's timestamp has "
+      "changed...");
+    sleep(2);
+    puts("Done sleeping.");
     test_file = fopen(test_http_template_filename5, "w");
     ASSERT_TRUE(test_file);
 
@@ -935,6 +944,24 @@ int main(void) {
       test_http_template_filename5,
       "/tmp/c_simple_http_cache_dir",
       &templates,
+      0xFFFFFFFF,
+      &buf);
+    CHECK_TRUE(int_ret > 0);
+    ASSERT_TRUE(buf);
+    CHECK_TRUE(strcmp(buf, "<h1>Alternate test text.<br>Yep.</h1>") == 0);
+    free(buf);
+    buf = NULL;
+
+    puts("Sleeping for two seconds to ensure cache file has aged...");
+    sleep(2);
+    puts("Done sleeping.");
+    // Re-run cache function, checking that it is invalidated.
+    int_ret = c_simple_http_cache_path(
+      "/",
+      test_http_template_filename5,
+      "/tmp/c_simple_http_cache_dir",
+      &templates,
+      1,
       &buf);
     CHECK_TRUE(int_ret > 0);
     ASSERT_TRUE(buf);

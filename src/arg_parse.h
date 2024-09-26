@@ -37,6 +37,7 @@ typedef struct Args {
   // Non-NULL if cache-dir is specified and cache is to be used.
   // Does not need to be free'd since it points to a string in argv.
   const char *cache_dir;
+  size_t cache_lifespan_seconds;
 } Args;
 
 void print_usage(void);

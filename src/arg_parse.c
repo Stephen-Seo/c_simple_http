@@ -29,6 +29,9 @@
 // Posix includes.
 #include <sys/stat.h>
 
+// Local includes.
+#include "constants.h"
+
 void print_usage(void) {
   puts("Usage:");
   puts("  -p <port> | --port <port>");
@@ -39,6 +42,7 @@ void print_usage(void) {
   puts("    Note that this option is case-insensitive");
   puts("  --enable-reload-config-on-change");
   puts("  --enable-cache-dir=<DIR>");
+  puts("  --cache-entry-lifetime-seconds=<SECONDS>");
 }
 
 Args parse_args(int32_t argc, char **argv) {
@@ -49,6 +53,7 @@ Args parse_args(int32_t argc, char **argv) {
   Args args;
   memset(&args, 0, sizeof(Args));
   args.list_of_headers_to_log = simple_archiver_list_init();
+  args.cache_lifespan_seconds = C_SIMPLE_HTTP_DEFAULT_CACHE_LIFESPAN_SECONDS;
 
   while (argc > 0) {
     if ((strcmp(argv[0], "-p") == 0 || strcmp(argv[0], "--port") == 0)
@@ -109,6 +114,20 @@ Args parse_args(int32_t argc, char **argv) {
         printf("Directory \"%s\" exists.\n", args.cache_dir);
       }
       closedir(d);
+    } else if (strncmp(argv[0], "--cache-entry-lifetime-seconds=", 31) == 0) {
+      args.cache_lifespan_seconds = strtoul(argv[0] + 31, NULL, 10);
+      if (args.cache_lifespan_seconds == 0) {
+        fprintf(
+          stderr,
+          "ERROR: Invalid --cache-entry-lifetime-seconds=%s entry!\n",
+          argv[0] + 31);
+        print_usage();
+        exit(1);
+      } else {
+        printf(
+          "NOTICE set cache-entry-lifetime to %lu\n",
+          args.cache_lifespan_seconds);
+      }
     } else {
       fprintf(stderr, "ERROR: Invalid args!\n");
       print_usage();

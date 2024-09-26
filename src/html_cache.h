@@ -37,6 +37,7 @@ int c_simple_http_cache_path(
   const char *config_filename,
   const char *cache_dir,
   C_SIMPLE_HTTP_HTTPTemplates *templates,
+  size_t cache_entry_lifespan,
   char **buf_out);
 
 #endif
