@@ -58,6 +58,11 @@ char c_simple_http_helper_hex_to_value(const char upper, const char lower);
 /// non-NULL, it must be free'd.
 char *c_simple_http_helper_unescape_uri(const char *uri);
 
+/// Returns zero if successful. "dirpath" will point to a directory on success.
+/// Returns 1 if the directory already exists.
+/// Other return values are errors.
+int c_simple_http_helper_mkdir_tree(const char *dirpath);
+
 #endif
 
 // vim: et ts=2 sts=2 sw=2

@@ -21,6 +21,17 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+// libc includes.
+#include <sys/types.h>
+#include <dirent.h>
+#include <errno.h>
+
+// Posix includes.
+#include <sys/stat.h>
+
+// Local includes.
+#include "constants.h"
+
 void print_usage(void) {
   puts("Usage:");
   puts("  -p <port> | --port <port>");
@@ -30,6 +41,8 @@ void print_usage(void) {
   puts("    For example: --req-header-to-print=User-Agent");
   puts("    Note that this option is case-insensitive");
   puts("  --enable-reload-config-on-change");
+  puts("  --enable-cache-dir=<DIR>");
+  puts("  --cache-entry-lifetime-seconds=<SECONDS>");
 }
 
 Args parse_args(int32_t argc, char **argv) {
@@ -40,6 +53,7 @@ Args parse_args(int32_t argc, char **argv) {
   Args args;
   memset(&args, 0, sizeof(Args));
   args.list_of_headers_to_log = simple_archiver_list_init();
+  args.cache_lifespan_seconds = C_SIMPLE_HTTP_DEFAULT_CACHE_LIFESPAN_SECONDS;
 
   while (argc > 0) {
     if ((strcmp(argv[0], "-p") == 0 || strcmp(argv[0], "--port") == 0)
@@ -69,8 +83,53 @@ Args parse_args(int32_t argc, char **argv) {
       }
     } else if (strcmp(argv[0], "--enable-reload-config-on-change") == 0) {
       args.flags |= 2;
+    } else if (strncmp(argv[0], "--enable-cache-dir=", 19) == 0) {
+      args.cache_dir = argv[0] + 19;
+      // Check if it actually is an existing directory.
+      DIR *d = opendir(args.cache_dir);
+      if (d == NULL) {
+        if (errno == ENOENT) {
+          printf(
+            "Directory \"%s\" doesn't exist, creating it...\n",
+            args.cache_dir);
+          int ret = mkdir(
+              args.cache_dir,
+              S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
+          if (ret == -1) {
+            fprintf(
+              stderr,
+              "ERROR Failed to create new directory (errno %d)\n",
+              errno);
+            exit(1);
+          }
+        } else {
+          fprintf(
+            stderr,
+            "ERROR Failed to open directory \"%s\" (errno %d)!\n",
+            args.cache_dir,
+            errno);
+          exit(1);
+        }
+      } else {
+        printf("Directory \"%s\" exists.\n", args.cache_dir);
+      }
+      closedir(d);
+    } else if (strncmp(argv[0], "--cache-entry-lifetime-seconds=", 31) == 0) {
+      args.cache_lifespan_seconds = strtoul(argv[0] + 31, NULL, 10);
+      if (args.cache_lifespan_seconds == 0) {
+        fprintf(
+          stderr,
+          "ERROR: Invalid --cache-entry-lifetime-seconds=%s entry!\n",
+          argv[0] + 31);
+        print_usage();
+        exit(1);
+      } else {
+        printf(
+          "NOTICE set cache-entry-lifetime to %lu\n",
+          args.cache_lifespan_seconds);
+      }
     } else {
-      puts("ERROR: Invalid args!\n");
+      fprintf(stderr, "ERROR: Invalid args!\n");
       print_usage();
       exit(1);
     }

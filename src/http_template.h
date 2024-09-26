@@ -22,14 +22,20 @@
 // Standard library includes.
 #include <stddef.h>
 
-// Returns non-NULL on success, which must be free'd after use.
-// Takes a path string and templates and returns the generated HTML.
-// If "output_buf_size" is non-NULL, it will be set to the size of the returned
-// buffer.
+// Third-party includes.
+#include <SimpleArchiver/src/data_structures/linked_list.h>
+
+// Returns non-NULL on success, which must be free'd after use. Takes a path
+// string and templates and returns the generated HTML. If "output_buf_size" is
+// non-NULL, it will be set to the size of the returned buffer. If
+// "files_list_out" is non-NULL, then the pointer will be set to a newly
+// allocated linked-list containing filenames used in generating the HTML. This
+// newly allocated linked-list must be freed after use.
 char *c_simple_http_path_to_generated(
   const char *path,
   const C_SIMPLE_HTTP_HTTPTemplates *templates,
-  size_t *output_buf_size);
+  size_t *output_buf_size,
+  SDArchiverLinkedList **files_list_out);
 
 #endif
 

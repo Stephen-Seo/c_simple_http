@@ -34,6 +34,10 @@ typedef struct Args {
   const char *config_file;
   // Needs to be free'd.
   SDArchiverLinkedList *list_of_headers_to_log;
+  // Non-NULL if cache-dir is specified and cache is to be used.
+  // Does not need to be free'd since it points to a string in argv.
+  const char *cache_dir;
+  size_t cache_lifespan_seconds;
 } Args;
 
 void print_usage(void);

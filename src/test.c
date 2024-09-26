@@ -4,15 +4,23 @@
 #include <stdlib.h>
 #include <stdint.h>
 
+// POSIX includes.
+#include <unistd.h>
+#include <sys/types.h>
+#include <dirent.h>
+
 // Local includes.
 #include "config.h"
+#include "helpers.h"
 #include "http_template.h"
 #include "http.h"
-#include "helpers.h"
+#include "html_cache.h"
+#include "constants.h"
 
 // Third party includes.
 #include <SimpleArchiver/src/helpers.h>
 #include <SimpleArchiver/src/data_structures/hash_map.h>
+#include <SimpleArchiver/src/data_structures/linked_list.h>
 
 static int32_t checks_checked = 0;
 static int32_t checks_passed = 0;
@@ -88,6 +96,15 @@ void test_internal_cleanup_delete_temporary_file(const char **filename) {
       fprintf(stderr, "ERROR Failed to remove file \"%s\"!\n", *filename);
     }
   }
+}
+
+int test_internal_check_matching_string_in_list(void *value, void *ud) {
+  if (value && ud) {
+    if (strcmp(value, ud) == 0) {
+      return 1;
+    }
+  }
+  return 0;
 }
 
 int main(void) {
@@ -253,12 +270,18 @@ int main(void) {
 
     size_t output_buf_size;
 
+    __attribute__((cleanup(simple_archiver_list_free)))
+    SDArchiverLinkedList *filenames_list = NULL;
+
     __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
-    char *buf = c_simple_http_path_to_generated("/", &config, &output_buf_size);
+    char *buf = c_simple_http_path_to_generated(
+        "/", &config, &output_buf_size, &filenames_list);
     ASSERT_TRUE(buf != NULL);
     ASSERT_TRUE(strcmp(buf, "<h1>Test</h1>") == 0);
     CHECK_TRUE(output_buf_size == 13);
+    CHECK_TRUE(filenames_list->count == 0);
     simple_archiver_helper_cleanup_c_string(&buf);
+    simple_archiver_list_free(&filenames_list);
 
     __attribute__((cleanup(test_internal_cleanup_delete_temporary_file)))
     const char *test_http_template_filename2 =
@@ -289,16 +312,19 @@ int main(void) {
     );
     ASSERT_TRUE(config.paths != NULL);
 
-    buf = c_simple_http_path_to_generated("/", &config, &output_buf_size);
+    buf = c_simple_http_path_to_generated(
+        "/", &config, &output_buf_size, &filenames_list);
     ASSERT_TRUE(buf != NULL);
-    printf("%s\n", buf);
+    //printf("%s\n", buf);
     ASSERT_TRUE(
       strcmp(
         buf,
         "<h1> Some text. </h1><br><h2> More text. </h2>")
       == 0);
     CHECK_TRUE(output_buf_size == 46);
+    CHECK_TRUE(filenames_list->count == 0);
     simple_archiver_helper_cleanup_c_string(&buf);
+    simple_archiver_list_free(&filenames_list);
 
     __attribute__((cleanup(test_internal_cleanup_delete_temporary_file)))
     const char *test_http_template_filename3 =
@@ -352,16 +378,24 @@ int main(void) {
     );
     ASSERT_TRUE(config.paths != NULL);
 
-    buf = c_simple_http_path_to_generated("/", &config, &output_buf_size);
+    buf = c_simple_http_path_to_generated(
+        "/", &config, &output_buf_size, &filenames_list);
     ASSERT_TRUE(buf != NULL);
-    printf("%s\n", buf);
+    //printf("%s\n", buf);
     ASSERT_TRUE(
       strcmp(
         buf,
         "<h1> testVar text. </h1><br><h2> testVar2 text. </h2>")
       == 0);
     CHECK_TRUE(output_buf_size == 53);
+    CHECK_TRUE(filenames_list->count == 1);
+    CHECK_TRUE(simple_archiver_list_get(
+        filenames_list,
+        test_internal_check_matching_string_in_list,
+        (void*)test_http_template_html_filename)
+      != NULL);
     simple_archiver_helper_cleanup_c_string(&buf);
+    simple_archiver_list_free(&filenames_list);
 
     __attribute__((cleanup(test_internal_cleanup_delete_temporary_file)))
     const char *test_http_template_filename4 =
@@ -435,15 +469,27 @@ int main(void) {
     );
     ASSERT_TRUE(config.paths != NULL);
 
-    buf = c_simple_http_path_to_generated("/", &config, &output_buf_size);
+    buf = c_simple_http_path_to_generated(
+        "/", &config, &output_buf_size, &filenames_list);
     ASSERT_TRUE(buf != NULL);
-    printf("%s\n", buf);
+    //printf("%s\n", buf);
     ASSERT_TRUE(
       strcmp(
         buf,
         "<h1> some test text in test var file. </h1>")
       == 0);
     CHECK_TRUE(output_buf_size == 43);
+    CHECK_TRUE(filenames_list->count == 2);
+    CHECK_TRUE(simple_archiver_list_get(
+        filenames_list,
+        test_internal_check_matching_string_in_list,
+        (void*)test_http_template_html_filename2)
+      != NULL);
+    CHECK_TRUE(simple_archiver_list_get(
+        filenames_list,
+        test_internal_check_matching_string_in_list,
+        (void*)test_http_template_html_var_filename)
+      != NULL);
     simple_archiver_helper_cleanup_c_string(&buf);
   }
 
@@ -480,27 +526,38 @@ int main(void) {
     free(stripped_path_buf);
 
     stripped_path_buf = c_simple_http_strip_path("/someurl/", 9);
+    //printf("stripped path: %s\n", stripped_path_buf);
     CHECK_STREQ(stripped_path_buf, "/someurl");
     free(stripped_path_buf);
 
     stripped_path_buf = c_simple_http_strip_path("/someurl/////", 13);
+    //printf("stripped path: %s\n", stripped_path_buf);
     CHECK_STREQ(stripped_path_buf, "/someurl");
     free(stripped_path_buf);
 
     stripped_path_buf = c_simple_http_strip_path("/someurl?key=value", 18);
+    //printf("stripped path: %s\n", stripped_path_buf);
     CHECK_STREQ(stripped_path_buf, "/someurl");
     free(stripped_path_buf);
 
     stripped_path_buf = c_simple_http_strip_path("/someurl#client_data", 20);
+    //printf("stripped path: %s\n", stripped_path_buf);
     CHECK_STREQ(stripped_path_buf, "/someurl");
     free(stripped_path_buf);
 
     stripped_path_buf = c_simple_http_strip_path("/someurl////?key=value", 22);
+    //printf("stripped path: %s\n", stripped_path_buf);
     CHECK_STREQ(stripped_path_buf, "/someurl");
     free(stripped_path_buf);
 
     stripped_path_buf = c_simple_http_strip_path("/someurl///#client_data", 23);
+    //printf("stripped path: %s\n", stripped_path_buf);
     CHECK_STREQ(stripped_path_buf, "/someurl");
+    free(stripped_path_buf);
+
+    stripped_path_buf = c_simple_http_strip_path("/someurl/////inner", 18);
+    //printf("stripped path: %s\n", stripped_path_buf);
+    CHECK_STREQ(stripped_path_buf, "/someurl/inner");
     free(stripped_path_buf);
   }
 
@@ -542,6 +599,379 @@ int main(void) {
     CHECK_TRUE(strcmp(buf, "ABC%ZZ") == 0);
     free(buf);
     buf = NULL;
+
+    DIR *dirp = opendir("/tmp/create_dirs_dir");
+    uint_fast8_t dir_exists = dirp ? 1 : 0;
+    closedir(dirp);
+    ASSERT_FALSE(dir_exists);
+
+    int ret = c_simple_http_helper_mkdir_tree("/tmp/create_dirs_dir/dir/");
+    int ret2 = rmdir("/tmp/create_dirs_dir/dir");
+    int ret3 = rmdir("/tmp/create_dirs_dir");
+
+    CHECK_TRUE(ret == 0);
+    CHECK_TRUE(ret2 == 0);
+    CHECK_TRUE(ret3 == 0);
+  }
+
+  // Test html_cache.
+  {
+    char *ret = c_simple_http_path_to_cache_filename("/");
+    ASSERT_TRUE(ret);
+    CHECK_TRUE(strcmp(ret, "ROOT") == 0);
+    free(ret);
+
+    ret = c_simple_http_path_to_cache_filename("////");
+    ASSERT_TRUE(ret);
+    CHECK_TRUE(strcmp(ret, "ROOT") == 0);
+    free(ret);
+
+    ret = c_simple_http_path_to_cache_filename("/inner");
+    ASSERT_TRUE(ret);
+    CHECK_TRUE(strcmp(ret, "0x2Finner") == 0);
+    free(ret);
+
+    ret = c_simple_http_path_to_cache_filename("/inner////");
+    ASSERT_TRUE(ret);
+    CHECK_TRUE(strcmp(ret, "0x2Finner") == 0);
+    free(ret);
+
+    ret = c_simple_http_path_to_cache_filename("/outer/inner");
+    ASSERT_TRUE(ret);
+    CHECK_TRUE(strcmp(ret, "0x2Fouter0x2Finner") == 0);
+    free(ret);
+
+    ret = c_simple_http_path_to_cache_filename("/outer/inner////");
+    ASSERT_TRUE(ret);
+    CHECK_TRUE(strcmp(ret, "0x2Fouter0x2Finner") == 0);
+    free(ret);
+
+    ret = c_simple_http_path_to_cache_filename("/outer///inner");
+    ASSERT_TRUE(ret);
+    CHECK_TRUE(strcmp(ret, "0x2Fouter0x2Finner") == 0);
+    free(ret);
+
+    ret = c_simple_http_path_to_cache_filename("/outer/with_hex_0x2F_inner");
+    ASSERT_TRUE(ret);
+    CHECK_TRUE(strcmp(ret, "%2Fouter%2Fwith_hex_0x2F_inner") == 0);
+    free(ret);
+
+    ret = c_simple_http_path_to_cache_filename("/outer/0x2F_hex_inner");
+    ASSERT_TRUE(ret);
+    CHECK_TRUE(strcmp(ret, "%2Fouter%2F0x2F_hex_inner") == 0);
+    free(ret);
+
+    ret = c_simple_http_path_to_cache_filename("/outer0x2F/inner_hex_0x2F");
+    ASSERT_TRUE(ret);
+    CHECK_TRUE(strcmp(ret, "%2Fouter0x2F%2Finner_hex_0x2F") == 0);
+    free(ret);
+
+    ret = c_simple_http_path_to_cache_filename(
+        "/0x2Fouter0x2F/0x2Finner_0x2F_hex_0x2F");
+    ASSERT_TRUE(ret);
+    CHECK_TRUE(strcmp(ret, "%2F0x2Fouter0x2F%2F0x2Finner_0x2F_hex_0x2F") == 0);
+    free(ret);
+
+    ret = c_simple_http_cache_filename_to_path("0x2Fouter0x2Finner");
+    ASSERT_TRUE(ret);
+    CHECK_TRUE(strcmp(ret, "/outer/inner") == 0);
+    free(ret);
+
+    ret = c_simple_http_cache_filename_to_path(
+      "0x2Fouter0x2Finner0x2F%2F0x2Fmore_inner");
+    ASSERT_TRUE(ret);
+    CHECK_TRUE(strcmp(ret, "/outer/inner/%2F/more_inner") == 0);
+    free(ret);
+
+    ret = c_simple_http_cache_filename_to_path("%2Fouter%2Finner");
+    ASSERT_TRUE(ret);
+    CHECK_TRUE(strcmp(ret, "/outer/inner") == 0);
+    free(ret);
+
+    ret = c_simple_http_cache_filename_to_path(
+      "%2Fouter%2Finner%2F0x2F%2Fmore_inner");
+    ASSERT_TRUE(ret);
+    CHECK_TRUE(strcmp(ret, "/outer/inner/0x2F/more_inner") == 0);
+    free(ret);
+
+    const char *uri0 = "/a/simple/url/with/inner/paths";
+    ret =
+      c_simple_http_path_to_cache_filename(uri0);
+    ASSERT_TRUE(ret);
+    CHECK_TRUE(
+      strcmp(ret, "0x2Fa0x2Fsimple0x2Furl0x2Fwith0x2Finner0x2Fpaths")
+      == 0);
+    char *ret2 = c_simple_http_cache_filename_to_path(ret);
+    free(ret);
+    ASSERT_TRUE(ret2);
+    CHECK_TRUE(strcmp(ret2, uri0) == 0);
+    free(ret2);
+
+    const char *uri1 = "/a/url/with/0x2F/in/it";
+    ret =
+      c_simple_http_path_to_cache_filename(uri1);
+    ASSERT_TRUE(ret);
+    CHECK_TRUE(
+      strcmp(ret, "%2Fa%2Furl%2Fwith%2F0x2F%2Fin%2Fit")
+      == 0);
+    ret2 = c_simple_http_cache_filename_to_path(ret);
+    free(ret);
+    ASSERT_TRUE(ret2);
+    CHECK_TRUE(strcmp(ret2, uri1) == 0);
+    free(ret2);
+
+    const char *uri2 = "/";
+    ret =
+      c_simple_http_path_to_cache_filename(uri2);
+    ASSERT_TRUE(ret);
+    CHECK_TRUE(strcmp(ret, "ROOT") == 0);
+    ret2 = c_simple_http_cache_filename_to_path(ret);
+    free(ret);
+    ASSERT_TRUE(ret2);
+    CHECK_TRUE(strcmp(ret2, uri2) == 0);
+    free(ret2);
+
+    const char *uri3 = "/a";
+    ret =
+      c_simple_http_path_to_cache_filename(uri3);
+    ASSERT_TRUE(ret);
+    CHECK_TRUE(strcmp(ret, "0x2Fa") == 0);
+    ret2 = c_simple_http_cache_filename_to_path(ret);
+    free(ret);
+    ASSERT_TRUE(ret2);
+    CHECK_TRUE(strcmp(ret2, uri3) == 0);
+    free(ret2);
+
+    // Set up test config to get template map to test cache.
+    __attribute__((cleanup(test_internal_cleanup_delete_temporary_file)))
+    const char *test_http_template_filename5 =
+      "/tmp/c_simple_http_template_test5.config";
+    __attribute__((cleanup(test_internal_cleanup_delete_temporary_file)))
+    const char *test_http_template_html_filename3 =
+      "/tmp/c_simple_http_template_test3.html";
+    __attribute__((cleanup(test_internal_cleanup_delete_temporary_file)))
+    const char *test_http_template_html_var_filename2 =
+      "/tmp/c_simple_http_template_test_var2.html";
+
+    FILE *test_file = fopen(test_http_template_filename5, "w");
+    ASSERT_TRUE(test_file);
+
+    ASSERT_TRUE(
+      fwrite(
+        "PATH=/\nHTML_FILE=/tmp/c_simple_http_template_test3.html\n",
+        1,
+        56,
+        test_file)
+      == 56);
+    ASSERT_TRUE(
+      fwrite(
+        "VAR_FILE=/tmp/c_simple_http_template_test_var2.html\n",
+        1,
+        52,
+        test_file)
+      == 52);
+    fclose(test_file);
+
+    test_file = fopen(test_http_template_html_filename3, "w");
+    ASSERT_TRUE(test_file);
+
+    ASSERT_TRUE(
+      fwrite(
+        "<body>{{{VAR_FILE}}}</body>\n",
+        1,
+        28,
+        test_file)
+      == 28);
+    fclose(test_file);
+
+    test_file = fopen(test_http_template_html_var_filename2, "w");
+    ASSERT_TRUE(test_file);
+
+    ASSERT_TRUE(
+      fwrite(
+        "Some test text.<br>Yep.",
+        1,
+        23,
+        test_file)
+      == 23);
+    fclose(test_file);
+
+    __attribute__((cleanup(c_simple_http_clean_up_parsed_config)))
+    C_SIMPLE_HTTP_ParsedConfig templates =
+      c_simple_http_parse_config(test_http_template_filename5, "PATH", NULL);
+    ASSERT_TRUE(templates.paths);
+
+    // Run cache function. Should return >0 due to new/first cache entry.
+    __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
+    char *buf = NULL;
+    int int_ret = c_simple_http_cache_path(
+      "/",
+      test_http_template_filename5,
+      "/tmp/c_simple_http_cache_dir",
+      &templates,
+      0xFFFFFFFF,
+      &buf);
+
+    CHECK_TRUE(int_ret > 0);
+    ASSERT_TRUE(buf);
+    CHECK_TRUE(strcmp(buf, "<body>Some test text.<br>Yep.</body>\n") == 0);
+    free(buf);
+    buf = NULL;
+
+    // Check/get size of cache file.
+    FILE *cache_file = fopen("/tmp/c_simple_http_cache_dir/ROOT", "r");
+    uint_fast8_t cache_file_exists = cache_file ? 1 : 0;
+    fseek(cache_file, 0, SEEK_END);
+    const long cache_file_size_0 = ftell(cache_file);
+    fclose(cache_file);
+    ASSERT_TRUE(cache_file_exists);
+
+    // Re-run cache function, checking that it is not invalidated.
+    int_ret = c_simple_http_cache_path(
+      "/",
+      test_http_template_filename5,
+      "/tmp/c_simple_http_cache_dir",
+      &templates,
+      0xFFFFFFFF,
+      &buf);
+    CHECK_TRUE(int_ret == 0);
+    ASSERT_TRUE(buf);
+    CHECK_TRUE(strcmp(buf, "<body>Some test text.<br>Yep.</body>\n") == 0);
+    free(buf);
+    buf = NULL;
+
+    // Check/get size of cache file.
+    cache_file = fopen("/tmp/c_simple_http_cache_dir/ROOT", "r");
+    cache_file_exists = cache_file ? 1 : 0;
+    fseek(cache_file, 0, SEEK_END);
+    const long cache_file_size_1 = ftell(cache_file);
+    fclose(cache_file);
+    ASSERT_TRUE(cache_file_exists);
+    CHECK_TRUE(cache_file_size_0 == cache_file_size_1);
+
+    // Change a file used by the template for PATH=/ .
+    // Sleep first since granularity is by the second.
+    puts("Sleeping for two seconds to ensure edited file's timestamp has "
+      "changed...");
+    sleep(2);
+    puts("Done sleeping.");
+    test_file = fopen(test_http_template_html_var_filename2, "w");
+    ASSERT_TRUE(test_file);
+
+    ASSERT_TRUE(
+      fwrite(
+        "Alternate test text.<br>Yep.",
+        1,
+        28,
+        test_file)
+      == 28);
+    fclose(test_file);
+
+    // Re-run cache function, checking that it is invalidated.
+    int_ret = c_simple_http_cache_path(
+      "/",
+      test_http_template_filename5,
+      "/tmp/c_simple_http_cache_dir",
+      &templates,
+      0xFFFFFFFF,
+      &buf);
+    CHECK_TRUE(int_ret > 0);
+    ASSERT_TRUE(buf);
+    CHECK_TRUE(strcmp(buf, "<body>Alternate test text.<br>Yep.</body>\n") == 0);
+    free(buf);
+    buf = NULL;
+
+    // Get/check size of cache file.
+    cache_file = fopen("/tmp/c_simple_http_cache_dir/ROOT", "r");
+    cache_file_exists = cache_file ? 1 : 0;
+    fseek(cache_file, 0, SEEK_END);
+    const long cache_file_size_2 = ftell(cache_file);
+    fclose(cache_file);
+    ASSERT_TRUE(cache_file_exists);
+    CHECK_TRUE(cache_file_size_0 != cache_file_size_2);
+
+    // Re-run cache function, checking that it is not invalidated.
+    int_ret = c_simple_http_cache_path(
+      "/",
+      test_http_template_filename5,
+      "/tmp/c_simple_http_cache_dir",
+      &templates,
+      0xFFFFFFFF,
+      &buf);
+    CHECK_TRUE(int_ret == 0);
+    ASSERT_TRUE(buf);
+    CHECK_TRUE(strcmp(buf, "<body>Alternate test text.<br>Yep.</body>\n") == 0);
+    free(buf);
+    buf = NULL;
+
+    // Get/check size of cache file.
+    cache_file = fopen("/tmp/c_simple_http_cache_dir/ROOT", "r");
+    cache_file_exists = cache_file ? 1 : 0;
+    fseek(cache_file, 0, SEEK_END);
+    const long cache_file_size_3 = ftell(cache_file);
+    fclose(cache_file);
+    ASSERT_TRUE(cache_file_exists);
+    CHECK_TRUE(cache_file_size_2 == cache_file_size_3);
+
+    // Edit config file.
+    puts("Sleeping for two seconds to ensure edited file's timestamp has "
+      "changed...");
+    sleep(2);
+    puts("Done sleeping.");
+    test_file = fopen(test_http_template_filename5, "w");
+    ASSERT_TRUE(test_file);
+
+    ASSERT_TRUE(
+      fwrite(
+        "PATH=/\nHTML='''<h1>{{{VAR_FILE}}}</h1>'''\n",
+        1,
+        42,
+        test_file)
+      == 42);
+    ASSERT_TRUE(
+      fwrite(
+        "VAR_FILE=/tmp/c_simple_http_template_test_var2.html\n",
+        1,
+        52,
+        test_file)
+      == 52);
+
+    fclose(test_file);
+
+    // Re-run cache function, checking that it is invalidated.
+    int_ret = c_simple_http_cache_path(
+      "/",
+      test_http_template_filename5,
+      "/tmp/c_simple_http_cache_dir",
+      &templates,
+      0xFFFFFFFF,
+      &buf);
+    CHECK_TRUE(int_ret > 0);
+    ASSERT_TRUE(buf);
+    CHECK_TRUE(strcmp(buf, "<h1>Alternate test text.<br>Yep.</h1>") == 0);
+    free(buf);
+    buf = NULL;
+
+    puts("Sleeping for two seconds to ensure cache file has aged...");
+    sleep(2);
+    puts("Done sleeping.");
+    // Re-run cache function, checking that it is invalidated.
+    int_ret = c_simple_http_cache_path(
+      "/",
+      test_http_template_filename5,
+      "/tmp/c_simple_http_cache_dir",
+      &templates,
+      1,
+      &buf);
+    CHECK_TRUE(int_ret > 0);
+    ASSERT_TRUE(buf);
+    CHECK_TRUE(strcmp(buf, "<h1>Alternate test text.<br>Yep.</h1>") == 0);
+    free(buf);
+    buf = NULL;
+
+    // Cleanup.
+    remove("/tmp/c_simple_http_cache_dir/ROOT");
+    rmdir("/tmp/c_simple_http_cache_dir");
   }
 
   RETURN()

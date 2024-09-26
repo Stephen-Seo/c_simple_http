@@ -12,6 +12,8 @@ A simple HTTP/1.1 server written in C.
         For example: --req-header-to-print=User-Agent
         Note that this option is case-insensitive
       --enable-reload-config-on-change
+      --enable-cache-dir=<DIR>
+      --cache-entry-lifetime-seconds=<SECONDS>
 
 ## Before Compiling
 
