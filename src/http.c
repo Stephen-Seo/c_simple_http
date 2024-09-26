@@ -62,7 +62,7 @@ const char *c_simple_http_response_code_error_to_response(
 char *c_simple_http_request_response(
     const char *request,
     uint32_t size,
-    const C_SIMPLE_HTTP_HTTPTemplates *templates,
+    C_SIMPLE_HTTP_HTTPTemplates *templates,
     size_t *out_size,
     enum C_SIMPLE_HTTP_ResponseCode *out_response_code,
     const char *cache_dir,

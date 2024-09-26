@@ -908,6 +908,40 @@ int main(void) {
     ASSERT_TRUE(cache_file_exists);
     CHECK_TRUE(cache_file_size_2 == cache_file_size_3);
 
+    // Edit config file.
+    test_file = fopen(test_http_template_filename5, "w");
+    ASSERT_TRUE(test_file);
+
+    ASSERT_TRUE(
+      fwrite(
+        "PATH=/\nHTML='''<h1>{{{VAR_FILE}}}</h1>'''\n",
+        1,
+        42,
+        test_file)
+      == 42);
+    ASSERT_TRUE(
+      fwrite(
+        "VAR_FILE=/tmp/c_simple_http_template_test_var2.html\n",
+        1,
+        52,
+        test_file)
+      == 52);
+
+    fclose(test_file);
+
+    // Re-run cache function, checking that it is invalidated.
+    int_ret = c_simple_http_cache_path(
+      "/",
+      test_http_template_filename5,
+      "/tmp/c_simple_http_cache_dir",
+      &templates,
+      &buf);
+    CHECK_TRUE(int_ret > 0);
+    ASSERT_TRUE(buf);
+    CHECK_TRUE(strcmp(buf, "<h1>Alternate test text.<br>Yep.</h1>") == 0);
+    free(buf);
+    buf = NULL;
+
     // Cleanup.
     remove("/tmp/c_simple_http_cache_dir/ROOT");
     rmdir("/tmp/c_simple_http_cache_dir");

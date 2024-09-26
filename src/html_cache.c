@@ -27,6 +27,7 @@
 
 // Third-party includes.
 #include <SimpleArchiver/src/data_structures/linked_list.h>
+#include <SimpleArchiver/src/data_structures/hash_map.h>
 #include <SimpleArchiver/src/helpers.h>
 
 // Local includes.
@@ -206,7 +207,7 @@ int c_simple_http_cache_path(
     const char *path,
     const char *config_filename,
     const char *cache_dir,
-    const C_SIMPLE_HTTP_HTTPTemplates *templates,
+    C_SIMPLE_HTTP_HTTPTemplates *templates,
     char **buf_out) {
   if (!path) {
     fprintf(stderr, "ERROR cache_path function: path is NULL!\n");
@@ -262,6 +263,7 @@ int c_simple_http_cache_path(
   // Get "stat" info on the cache filename.
   uint_fast8_t force_cache_update = 0;
   struct stat cache_file_stat;
+  memset(&cache_file_stat, 0, sizeof(struct stat));
   ret = stat(cache_filename_full, &cache_file_stat);
   if (ret == -1) {
     if (errno == ENOENT) {
@@ -279,6 +281,7 @@ int c_simple_http_cache_path(
 
   // Get "stat" info on config file.
   struct stat config_file_stat;
+  memset(&config_file_stat, 0, sizeof(struct stat));
   ret = stat(config_filename, &config_file_stat);
   if (ret == -1) {
     if (errno == ENOENT) {
@@ -395,6 +398,24 @@ CACHE_FILE_WRITE_CHECK:
          && cache_file_stat.st_mtim.tv_nsec < config_file_stat.st_mtim.tv_nsec))
   {
     // Cache file is out of date.
+
+    if (cache_file_stat.st_mtim.tv_sec < config_file_stat.st_mtim.tv_sec
+        || (cache_file_stat.st_mtim.tv_sec == config_file_stat.st_mtim.tv_sec
+           && cache_file_stat.st_mtim.tv_nsec
+              < config_file_stat.st_mtim.tv_nsec))
+    {
+      // Reload config file.
+      C_SIMPLE_HTTP_HTTPTemplates new_parsed_config =
+        c_simple_http_parse_config(
+          config_filename,
+          "PATH",
+          NULL);
+      if (new_parsed_config.hash_map) {
+        simple_archiver_hash_map_free(&templates->hash_map);
+        *templates = new_parsed_config;
+      }
+    }
+
     __attribute__((cleanup(simple_archiver_helper_cleanup_FILE)))
     FILE *cache_fd = fopen(cache_filename_full, "w");
     if (fwrite("--- CACHE ENTRY ---\n", 1, 20, cache_fd) != 20) {
