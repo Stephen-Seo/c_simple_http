@@ -211,6 +211,9 @@ C_SIMPLE_HTTP_StaticFileInfo c_simple_http_get_file(const char *static_dir,
                                    from_xdg_mime_pipe[1],
                                    STDOUT_FILENO);
 
+  // Close "read" side of pipe on "xdg-mime"'s side.
+  posix_spawn_file_actions_addclose(actions, from_xdg_mime_pipe[0]);
+
   buf_size = 256;
   buf = malloc(buf_size);
   uint64_t buf_idx = 0;
