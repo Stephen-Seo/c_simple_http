@@ -16,6 +16,7 @@
 #include "http.h"
 #include "html_cache.h"
 #include "constants.h"
+#include "static.h"
 
 // Third party includes.
 #include <SimpleArchiver/src/helpers.h>
@@ -107,7 +108,7 @@ int test_internal_check_matching_string_in_list(void *value, void *ud) {
   return 0;
 }
 
-int main(void) {
+int main(int argc, char **argv) {
   // Test config.
   {
     __attribute__((cleanup(test_internal_cleanup_delete_temporary_file)))
@@ -972,6 +973,26 @@ int main(void) {
     // Cleanup.
     remove("/tmp/c_simple_http_cache_dir/ROOT");
     rmdir("/tmp/c_simple_http_cache_dir");
+  }
+
+  // Test static.
+  {
+    FILE *fd = fopen("/usr/bin/xdg-mime", "rb");
+    int_fast8_t is_xdg_mime_exists = fd ? 1 : 0;
+    fclose(fd);
+
+    if (is_xdg_mime_exists) {
+      CHECK_TRUE(c_simple_http_is_xdg_mime_available());
+
+      C_SIMPLE_HTTP_StaticFileInfo info = c_simple_http_get_file(".", argv[0]);
+      CHECK_TRUE(info.buf);
+      CHECK_TRUE(info.buf_size > 0);
+      CHECK_TRUE(info.mime_type);
+      printf("unit test mime type is: %s\n", info.mime_type);
+      c_simple_http_cleanup_static_file_info(&info);
+    } else {
+      CHECK_FALSE(c_simple_http_is_xdg_mime_available());
+    }
   }
 
   RETURN()

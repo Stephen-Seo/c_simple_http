@@ -43,7 +43,8 @@ HEADERS = \
 	src/config.h \
 	src/http_template.h \
 	src/helpers.h \
-	src/html_cache.h
+	src/html_cache.h \
+	src/static.h
 
 SOURCES = \
 		src/main.c \
@@ -57,6 +58,7 @@ SOURCES = \
 		src/http_template.c \
 		src/helpers.c \
 		src/html_cache.c \
+		src/static.c \
 		third_party/SimpleArchiver/src/helpers.c \
 		third_party/SimpleArchiver/src/data_structures/linked_list.c \
 		third_party/SimpleArchiver/src/data_structures/hash_map.c \
