@@ -114,7 +114,11 @@ C_SIMPLE_HTTP_StaticFileInfo c_simple_http_get_file(const char *static_dir,
   C_SIMPLE_HTTP_StaticFileInfo file_info;
   memset(&file_info, 0, sizeof(C_SIMPLE_HTTP_StaticFileInfo));
 
-  if (!static_dir || !path || !c_simple_http_is_xdg_mime_available()) {
+  if (!static_dir || !path) {
+    file_info.result = STATIC_FILE_RESULT_InvalidParameter;
+    return file_info;
+  } else if (!c_simple_http_is_xdg_mime_available()) {
+    file_info.result = STATIC_FILE_RESULT_NoXDGMimeAvailable;
     return file_info;
   }
 
@@ -128,10 +132,12 @@ C_SIMPLE_HTTP_StaticFileInfo c_simple_http_get_file(const char *static_dir,
         buf_size *= 2;
         buf = realloc(buf, buf_size);
         if (buf == NULL) {
+          file_info.result = STATIC_FILE_RESULT_InternalError;
           return file_info;
         }
       } else {
         free(buf);
+        file_info.result = STATIC_FILE_RESULT_InternalError;
         return file_info;
       }
     } else {
@@ -148,6 +154,7 @@ C_SIMPLE_HTTP_StaticFileInfo c_simple_http_get_file(const char *static_dir,
             "ERROR: Failed to chdir into \"%s\"! (errno %d)\n",
             static_dir,
             errno);
+    file_info.result = STATIC_FILE_RESULT_InternalError;
     return file_info;
   }
 
@@ -162,6 +169,7 @@ C_SIMPLE_HTTP_StaticFileInfo c_simple_http_get_file(const char *static_dir,
     }
     if (path[idx] == 0) {
       fprintf(stderr, "ERROR: Received invalid path \"%s\"!\n", path);
+      file_info.result = STATIC_FILE_RESULT_InvalidParameter;
       return file_info;
     }
   }
@@ -169,6 +177,7 @@ C_SIMPLE_HTTP_StaticFileInfo c_simple_http_get_file(const char *static_dir,
 
   if (fd == NULL) {
     fprintf(stderr, "ERROR: Failed to open path \"%s\"!\n", path + idx);
+    file_info.result = STATIC_FILE_RESULT_FileError;
     return file_info;
   }
 
@@ -176,6 +185,7 @@ C_SIMPLE_HTTP_StaticFileInfo c_simple_http_get_file(const char *static_dir,
   long long_ret = ftell(fd);
   if (long_ret < 0) {
     fprintf(stderr, "ERROR: Failed to seek in path fd \"%s\"!\n", path);
+    file_info.result = STATIC_FILE_RESULT_FileError;
     return file_info;
   }
   fseek(fd, 0, SEEK_SET);
@@ -186,6 +196,7 @@ C_SIMPLE_HTTP_StaticFileInfo c_simple_http_get_file(const char *static_dir,
     fprintf(stderr, "ERROR: Failed to read path fd \"%s\"!\n", path);
     free(file_info.buf);
     file_info.buf_size = 0;
+    file_info.result = STATIC_FILE_RESULT_FileError;
     return file_info;
   }
 
@@ -204,6 +215,7 @@ C_SIMPLE_HTTP_StaticFileInfo c_simple_http_get_file(const char *static_dir,
     c_simple_http_cleanup_static_file_info(&file_info);
     close(from_xdg_mime_pipe[1]);
     close(from_xdg_mime_pipe[0]);
+    file_info.result = STATIC_FILE_RESULT_InternalError;
     return file_info;
   }
 
@@ -234,6 +246,7 @@ C_SIMPLE_HTTP_StaticFileInfo c_simple_http_get_file(const char *static_dir,
     c_simple_http_cleanup_static_file_info(&file_info);
     close(from_xdg_mime_pipe[1]);
     close(from_xdg_mime_pipe[0]);
+    file_info.result = STATIC_FILE_RESULT_InternalError;
     return file_info;
   }
 
@@ -253,6 +266,7 @@ C_SIMPLE_HTTP_StaticFileInfo c_simple_http_get_file(const char *static_dir,
         if (buf == NULL) {
           c_simple_http_cleanup_static_file_info(&file_info);
           close(from_xdg_mime_pipe[0]);
+          file_info.result = STATIC_FILE_RESULT_InternalError;
           return file_info;
         }
       }
@@ -264,6 +278,7 @@ C_SIMPLE_HTTP_StaticFileInfo c_simple_http_get_file(const char *static_dir,
 
   if (ret != 0) {
     c_simple_http_cleanup_static_file_info(&file_info);
+    file_info.result = STATIC_FILE_RESULT_InternalError;
     return file_info;
   }
 
@@ -274,6 +289,7 @@ C_SIMPLE_HTTP_StaticFileInfo c_simple_http_get_file(const char *static_dir,
 
   file_info.mime_type = buf;
 
+  file_info.result = STATIC_FILE_RESULT_OK;
   return file_info;
 }
 

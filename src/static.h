@@ -20,10 +20,19 @@
 // Standard library includes.
 #include <stdint.h>
 
+typedef enum C_SIMPLE_HTTP_StaticFileResult {
+  STATIC_FILE_RESULT_OK,
+  STATIC_FILE_RESULT_FileError,
+  STATIC_FILE_RESULT_InvalidParameter,
+  STATIC_FILE_RESULT_NoXDGMimeAvailable,
+  STATIC_FILE_RESULT_InternalError
+} C_SIMPLE_HTTP_StaticFileResult;
+
 typedef struct C_SIMPLE_HTTP_StaticFileInfo {
   char *buf;
   uint64_t buf_size;
   char *mime_type;
+  C_SIMPLE_HTTP_StaticFileResult result;
 } C_SIMPLE_HTTP_StaticFileInfo;
 
 /// Returns non-zero if "xdg_mime" is available.
