@@ -979,7 +979,9 @@ int main(int argc, char **argv) {
   {
     FILE *fd = fopen("/usr/bin/xdg-mime", "rb");
     int_fast8_t is_xdg_mime_exists = fd ? 1 : 0;
-    fclose(fd);
+    if (fd) {
+      fclose(fd);
+    }
 
     if (is_xdg_mime_exists) {
       CHECK_TRUE(c_simple_http_is_xdg_mime_available());
