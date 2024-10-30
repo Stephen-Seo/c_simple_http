@@ -50,7 +50,8 @@ char *c_simple_http_request_response(
   C_SIMPLE_HTTP_HTTPTemplates *templates,
   size_t *out_size,
   enum C_SIMPLE_HTTP_ResponseCode *out_response_code,
-  const Args *args
+  const Args *args,
+  char **request_path_out
 );
 
 /// Takes a PATH string and returns a "bare" path.

@@ -38,6 +38,9 @@ typedef struct Args {
   // Does not need to be free'd since it points to a string in argv.
   const char *cache_dir;
   size_t cache_lifespan_seconds;
+  // Non-NULL if static-dir is specified and files in the dir are to be served.
+  // Does not need to be free'd since it points to a string in argv.
+  const char *static_dir;
 } Args;
 
 void print_usage(void);

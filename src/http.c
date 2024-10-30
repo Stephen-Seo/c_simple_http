@@ -65,7 +65,8 @@ char *c_simple_http_request_response(
     C_SIMPLE_HTTP_HTTPTemplates *templates,
     size_t *out_size,
     enum C_SIMPLE_HTTP_ResponseCode *out_response_code,
-    const Args *args) {
+    const Args *args,
+    char **request_path_out) {
   if (out_size) {
     *out_size = 0;
   }
@@ -176,6 +177,11 @@ char *c_simple_http_request_response(
 
   char *generated_buf = NULL;
 
+  if (request_path_out) {
+    *request_path_out =
+      strdup(stripped_path ? stripped_path : request_path_unescaped);
+  }
+
   if (args->cache_dir) {
     int ret = c_simple_http_cache_path(
       stripped_path ? stripped_path : request_path_unescaped,
@@ -212,7 +218,8 @@ char *c_simple_http_request_response(
   }
 
   if (!generated_buf || generated_size == 0) {
-    fprintf(stderr, "ERROR Unable to generate response html for path \"%s\"!\n",
+    fprintf(stderr,
+            "WARNING Unable to generate response html for path \"%s\"!\n",
       request_path);
     if (out_response_code) {
       if (

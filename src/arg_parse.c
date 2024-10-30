@@ -43,6 +43,7 @@ void print_usage(void) {
   puts("  --enable-reload-config-on-change");
   puts("  --enable-cache-dir=<DIR>");
   puts("  --cache-entry-lifetime-seconds=<SECONDS>");
+  puts("  --enable-static-dir=<DIR>");
 }
 
 Args parse_args(int32_t argc, char **argv) {
@@ -128,6 +129,29 @@ Args parse_args(int32_t argc, char **argv) {
           "NOTICE set cache-entry-lifetime to %lu\n",
           args.cache_lifespan_seconds);
       }
+    } else if (strncmp(argv[0], "--enable-static-dir=", 20) == 0) {
+      args.static_dir = argv[0] + 20;
+      // Check if it actually is an existing directory.
+      DIR *d = opendir(args.static_dir);
+      if (d == NULL) {
+        if (errno == ENOENT) {
+          fprintf(
+            stderr,
+            "ERROR Directory \"%s\" does not exist!\n",
+            args.static_dir);
+          exit(1);
+        } else {
+          fprintf(
+            stderr,
+            "ERROR Failed to open directory \"%s\" (errno %d)!\n",
+            args.static_dir,
+            errno);
+          exit(1);
+        }
+      } else {
+        printf("Directory \"%s\" exists.\n", args.static_dir);
+      }
+      closedir(d);
     } else {
       fprintf(stderr, "ERROR: Invalid args!\n");
       print_usage();

@@ -42,8 +42,16 @@
 #include "constants.h"
 #include "http.h"
 #include "helpers.h"
+#include "static.h"
 
 #define CHECK_ERROR_WRITE(write_expr) \
+  if (write_expr < 0) { \
+    close(connection_fd); \
+    fprintf(stderr, "ERROR Failed to write to connected peer, closing...\n"); \
+    return 1; \
+  }
+
+#define CHECK_ERROR_WRITE_CONTINUE(write_expr) \
   if (write_expr < 0) { \
     close(connection_fd); \
     fprintf(stderr, "ERROR Failed to write to connected peer, closing...\n"); \
@@ -72,6 +80,31 @@ void c_simple_http_inotify_fd_cleanup(int *fd) {
     close(*fd);
     *fd = -1;
   }
+}
+
+int c_simple_http_on_error(
+    enum C_SIMPLE_HTTP_ResponseCode response_code,
+    int connection_fd
+) {
+  const char *response = c_simple_http_response_code_error_to_response(
+    response_code);
+  size_t response_size;
+  if (response) {
+    response_size = strlen(response);
+    CHECK_ERROR_WRITE(write(connection_fd, response, response_size));
+  } else {
+    CHECK_ERROR_WRITE(write(
+      connection_fd, "HTTP/1.1 500 Internal Server Error\n", 35));
+    CHECK_ERROR_WRITE(write(connection_fd, "Allow: GET\n", 11));
+    CHECK_ERROR_WRITE(write(connection_fd, "Connection: close\n", 18));
+    CHECK_ERROR_WRITE(write(
+      connection_fd, "Content-Type: text/html\n", 24));
+    CHECK_ERROR_WRITE(write(connection_fd, "Content-Length: 35\n", 19));
+    CHECK_ERROR_WRITE(write(
+      connection_fd, "\n<h1>500 Internal Server Error</h1>\n", 36));
+  }
+
+  return 0;
 }
 
 int main(int argc, char **argv) {
@@ -354,18 +387,23 @@ int main(int argc, char **argv) {
 
       size_t response_size = 0;
       enum C_SIMPLE_HTTP_ResponseCode response_code;
+      __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
+      char *request_path = NULL;
       const char *response = c_simple_http_request_response(
         (const char*)recv_buf,
         (uint32_t)read_ret,
         &parsed_config,
         &response_size,
         &response_code,
-        &args);
+        &args,
+        &request_path);
       if (response && response_code == C_SIMPLE_HTTP_Response_200_OK) {
-        CHECK_ERROR_WRITE(write(connection_fd, "HTTP/1.1 200 OK\n", 16));
-        CHECK_ERROR_WRITE(write(connection_fd, "Allow: GET\n", 11));
-        CHECK_ERROR_WRITE(write(connection_fd, "Connection: close\n", 18));
-        CHECK_ERROR_WRITE(write(
+        CHECK_ERROR_WRITE_CONTINUE(write(
+          connection_fd, "HTTP/1.1 200 OK\n", 16));
+        CHECK_ERROR_WRITE_CONTINUE(write(connection_fd, "Allow: GET\n", 11));
+        CHECK_ERROR_WRITE_CONTINUE(write(
+          connection_fd, "Connection: close\n", 18));
+        CHECK_ERROR_WRITE_CONTINUE(write(
           connection_fd, "Content-Type: text/html\n", 24));
         char content_length_buf[128];
         size_t content_length_buf_size = 0;
@@ -386,28 +424,83 @@ int main(int argc, char **argv) {
           continue;
         }
         content_length_buf_size += (size_t)written;
-        CHECK_ERROR_WRITE(write(
+        CHECK_ERROR_WRITE_CONTINUE(write(
           connection_fd, content_length_buf, content_length_buf_size));
-        CHECK_ERROR_WRITE(write(connection_fd, "\n", 1));
-        CHECK_ERROR_WRITE(write(connection_fd, response, response_size));
+        CHECK_ERROR_WRITE_CONTINUE(write(connection_fd, "\n", 1));
+        CHECK_ERROR_WRITE_CONTINUE(write(
+          connection_fd, response, response_size));
 
         free((void*)response);
-      } else {
-        const char *response = c_simple_http_response_code_error_to_response(
-          response_code);
-        if (response) {
-          response_size = strlen(response);
-          CHECK_ERROR_WRITE(write(connection_fd, response, response_size));
+      } else if (
+          response_code == C_SIMPLE_HTTP_Response_404_Not_Found
+          && args.static_dir) {
+        __attribute__((cleanup(c_simple_http_cleanup_static_file_info)))
+        C_SIMPLE_HTTP_StaticFileInfo file_info =
+          c_simple_http_get_file(args.static_dir, request_path, 0);
+        if (file_info.result == STATIC_FILE_RESULT_NoXDGMimeAvailable) {
+          file_info = c_simple_http_get_file(args.static_dir, request_path, 1);
+        }
+
+        if (file_info.result != STATIC_FILE_RESULT_OK
+            || !file_info.buf
+            || file_info.buf_size == 0
+            || !file_info.mime_type) {
+          if (file_info.result == STATIC_FILE_RESULT_FileError
+              || file_info.result == STATIC_FILE_RESULT_InternalError) {
+            response_code = C_SIMPLE_HTTP_Response_500_Internal_Server_Error;
+          } else if (file_info.result == STATIC_FILE_RESULT_InvalidParameter) {
+            response_code = C_SIMPLE_HTTP_Response_400_Bad_Request;
+          } else {
+            response_code = C_SIMPLE_HTTP_Response_500_Internal_Server_Error;
+          }
+
+          if (c_simple_http_on_error(response_code, connection_fd)) {
+            continue;
+          }
         } else {
-          CHECK_ERROR_WRITE(write(
-            connection_fd, "HTTP/1.1 500 Internal Server Error\n", 35));
-          CHECK_ERROR_WRITE(write(connection_fd, "Allow: GET\n", 11));
-          CHECK_ERROR_WRITE(write(connection_fd, "Connection: close\n", 18));
-          CHECK_ERROR_WRITE(write(
-            connection_fd, "Content-Type: text/html\n", 24));
-          CHECK_ERROR_WRITE(write(connection_fd, "Content-Length: 35\n", 19));
-          CHECK_ERROR_WRITE(write(
-            connection_fd, "\n<h1>500 Internal Server Error</h1>\n", 36));
+          CHECK_ERROR_WRITE_CONTINUE(write(
+            connection_fd, "HTTP/1.1 200 OK\n", 16));
+          CHECK_ERROR_WRITE_CONTINUE(write(connection_fd, "Allow: GET\n", 11));
+          CHECK_ERROR_WRITE_CONTINUE(write(
+            connection_fd, "Connection: close\n", 18));
+          uint64_t mime_length = strlen(file_info.mime_type);
+          __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
+          char *mime_type_buf = malloc(mime_length + 1 + 14 + 1);
+          snprintf(
+            mime_type_buf,
+            mime_length + 1 + 14 + 1,
+            "Content-Type: %s\n",
+            file_info.mime_type);
+          CHECK_ERROR_WRITE_CONTINUE(write(
+            connection_fd, mime_type_buf, mime_length + 1 + 14));
+          uint64_t content_str_len = 0;
+          for(uint64_t buf_size_temp = file_info.buf_size;
+              buf_size_temp > 0;
+              buf_size_temp /= 10) {
+            ++content_str_len;
+          }
+          if (content_str_len == 0) {
+            content_str_len = 1;
+          }
+          __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
+          char *content_length_buf = malloc(content_str_len + 1 + 16 + 1);
+          snprintf(
+            content_length_buf,
+            content_str_len + 1 + 16 + 1,
+            "Content-Length: %lu\n",
+            file_info.buf_size);
+          CHECK_ERROR_WRITE_CONTINUE(write(
+            connection_fd, content_length_buf, content_str_len + 1 + 16));
+          CHECK_ERROR_WRITE_CONTINUE(write(connection_fd, "\n", 1));
+          CHECK_ERROR_WRITE_CONTINUE(write(
+            connection_fd, file_info.buf, file_info.buf_size));
+          fprintf(stderr,
+                  "NOTICE Found static file for path \"%s\"\n",
+                  request_path);
+        }
+      } else {
+        if (c_simple_http_on_error(response_code, connection_fd)) {
+          continue;
         }
       }
       close(connection_fd);
