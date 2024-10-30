@@ -35,9 +35,9 @@ Without this, the project will fail to build.
     # Run it with the example config.
     # Note that the example config was designed such that it must be referred
     # to from its parent directory.
-    ./c_simple_http --config=example_config/example.config
+    ./c_simple_http --config=example_config/example.config --enable-static-dir=example_static_dir
     # If built with cmake:
-    ./buildDebug/c_simple_http --config=example_config/example.config
+    ./buildDebug/c_simple_http --config=example_config/example.config --enable-static-dir=example_static_dir
     
     # If port is not specified, the server picks a random port.
     # This program should print which TCP port it is listening on.
