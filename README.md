@@ -14,6 +14,7 @@ A simple HTTP/1.1 server written in C.
       --enable-reload-config-on-change
       --enable-cache-dir=<DIR>
       --cache-entry-lifetime-seconds=<SECONDS>
+      --enable-static-dir=<DIR>
 
 ## Before Compiling
 
