@@ -109,15 +109,15 @@ void c_simple_http_cleanup_static_file_info(
   }
 }
 
-C_SIMPLE_HTTP_StaticFileInfo c_simple_http_get_file(const char *static_dir,
-                                                    const char *path) {
+C_SIMPLE_HTTP_StaticFileInfo c_simple_http_get_file(
+    const char *static_dir, const char *path, int_fast8_t ignore_mime_type) {
   C_SIMPLE_HTTP_StaticFileInfo file_info;
   memset(&file_info, 0, sizeof(C_SIMPLE_HTTP_StaticFileInfo));
 
   if (!static_dir || !path) {
     file_info.result = STATIC_FILE_RESULT_InvalidParameter;
     return file_info;
-  } else if (!c_simple_http_is_xdg_mime_available()) {
+  } else if (!ignore_mime_type && !c_simple_http_is_xdg_mime_available()) {
     file_info.result = STATIC_FILE_RESULT_NoXDGMimeAvailable;
     return file_info;
   }
@@ -202,92 +202,96 @@ C_SIMPLE_HTTP_StaticFileInfo c_simple_http_get_file(const char *static_dir,
 
   simple_archiver_helper_cleanup_FILE(&fd);
 
-  int from_xdg_mime_pipe[2];
-  ret = pipe(from_xdg_mime_pipe);
+  if (ignore_mime_type) {
+    file_info.mime_type = strdup("application/octet-stream");
+  } else {
+    int from_xdg_mime_pipe[2];
+    ret = pipe(from_xdg_mime_pipe);
 
-  __attribute__((cleanup(internal_cleanup_file_actions)))
-  posix_spawn_file_actions_t *actions =
-    malloc(sizeof(posix_spawn_file_actions_t));
-  ret = posix_spawn_file_actions_init(actions);
-  if (ret != 0) {
-    free(actions);
-    actions = NULL;
-    c_simple_http_cleanup_static_file_info(&file_info);
+    __attribute__((cleanup(internal_cleanup_file_actions)))
+    posix_spawn_file_actions_t *actions =
+      malloc(sizeof(posix_spawn_file_actions_t));
+    ret = posix_spawn_file_actions_init(actions);
+    if (ret != 0) {
+      free(actions);
+      actions = NULL;
+      c_simple_http_cleanup_static_file_info(&file_info);
+      close(from_xdg_mime_pipe[1]);
+      close(from_xdg_mime_pipe[0]);
+      file_info.result = STATIC_FILE_RESULT_InternalError;
+      return file_info;
+    }
+
+    posix_spawn_file_actions_adddup2(actions,
+                                     from_xdg_mime_pipe[1],
+                                     STDOUT_FILENO);
+
+    // Close "read" side of pipe on "xdg-mime"'s side.
+    posix_spawn_file_actions_addclose(actions, from_xdg_mime_pipe[0]);
+
+    buf_size = 256;
+    buf = malloc(buf_size);
+    uint64_t buf_idx = 0;
+
+    char *path_plus_idx = (char*)path + idx;
+    pid_t pid;
+    ret = posix_spawnp(&pid,
+                       "xdg-mime",
+                       actions,
+                       NULL,
+                       (char *const[]){"xdg-mime",
+                                       "query",
+                                       "filetype",
+                                       path_plus_idx,
+                                       NULL},
+                       environ);
+    if (ret != 0) {
+      c_simple_http_cleanup_static_file_info(&file_info);
+      close(from_xdg_mime_pipe[1]);
+      close(from_xdg_mime_pipe[0]);
+      file_info.result = STATIC_FILE_RESULT_InternalError;
+      return file_info;
+    }
+
     close(from_xdg_mime_pipe[1]);
-    close(from_xdg_mime_pipe[0]);
-    file_info.result = STATIC_FILE_RESULT_InternalError;
-    return file_info;
-  }
 
-  posix_spawn_file_actions_adddup2(actions,
-                                   from_xdg_mime_pipe[1],
-                                   STDOUT_FILENO);
-
-  // Close "read" side of pipe on "xdg-mime"'s side.
-  posix_spawn_file_actions_addclose(actions, from_xdg_mime_pipe[0]);
-
-  buf_size = 256;
-  buf = malloc(buf_size);
-  uint64_t buf_idx = 0;
-
-  char *path_plus_idx = (char*)path + idx;
-  pid_t pid;
-  ret = posix_spawnp(&pid,
-                     "xdg-mime",
-                     actions,
-                     NULL,
-                     (char *const[]){"xdg-mime",
-                                     "query",
-                                     "filetype",
-                                     path_plus_idx,
-                                     NULL},
-                     environ);
-  if (ret != 0) {
-    c_simple_http_cleanup_static_file_info(&file_info);
-    close(from_xdg_mime_pipe[1]);
-    close(from_xdg_mime_pipe[0]);
-    file_info.result = STATIC_FILE_RESULT_InternalError;
-    return file_info;
-  }
-
-  close(from_xdg_mime_pipe[1]);
-
-  ssize_t ssize_t_ret;
-  while (1) {
-    ssize_t_ret =
-      read(from_xdg_mime_pipe[0], buf + buf_idx, buf_size - buf_idx);
-    if (ssize_t_ret <= 0) {
-      break;
-    } else {
-      buf_idx += (uint64_t)ssize_t_ret;
-      if (buf_idx >= buf_size) {
-        buf_size *= 2;
-        buf = realloc(buf, buf_size);
-        if (buf == NULL) {
-          c_simple_http_cleanup_static_file_info(&file_info);
-          close(from_xdg_mime_pipe[0]);
-          file_info.result = STATIC_FILE_RESULT_InternalError;
-          return file_info;
+    ssize_t ssize_t_ret;
+    while (1) {
+      ssize_t_ret =
+        read(from_xdg_mime_pipe[0], buf + buf_idx, buf_size - buf_idx);
+      if (ssize_t_ret <= 0) {
+        break;
+      } else {
+        buf_idx += (uint64_t)ssize_t_ret;
+        if (buf_idx >= buf_size) {
+          buf_size *= 2;
+          buf = realloc(buf, buf_size);
+          if (buf == NULL) {
+            c_simple_http_cleanup_static_file_info(&file_info);
+            close(from_xdg_mime_pipe[0]);
+            file_info.result = STATIC_FILE_RESULT_InternalError;
+            return file_info;
+          }
         }
       }
     }
+
+    close(from_xdg_mime_pipe[0]);
+    waitpid(pid, &ret, 0);
+
+    if (ret != 0) {
+      c_simple_http_cleanup_static_file_info(&file_info);
+      file_info.result = STATIC_FILE_RESULT_InternalError;
+      return file_info;
+    }
+
+    buf[buf_idx] = 0;
+    if (buf[buf_idx-1] == '\n') {
+      buf[buf_idx-1] = 0;
+    }
+
+    file_info.mime_type = buf;
   }
-
-  close(from_xdg_mime_pipe[0]);
-  waitpid(pid, &ret, 0);
-
-  if (ret != 0) {
-    c_simple_http_cleanup_static_file_info(&file_info);
-    file_info.result = STATIC_FILE_RESULT_InternalError;
-    return file_info;
-  }
-
-  buf[buf_idx] = 0;
-  if (buf[buf_idx-1] == '\n') {
-    buf[buf_idx-1] = 0;
-  }
-
-  file_info.mime_type = buf;
 
   file_info.result = STATIC_FILE_RESULT_OK;
   return file_info;

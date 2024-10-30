@@ -984,7 +984,7 @@ int main(int argc, char **argv) {
     if (is_xdg_mime_exists) {
       CHECK_TRUE(c_simple_http_is_xdg_mime_available());
 
-      C_SIMPLE_HTTP_StaticFileInfo info = c_simple_http_get_file(".", argv[0]);
+      C_SIMPLE_HTTP_StaticFileInfo info = c_simple_http_get_file(".", argv[0], 0);
       CHECK_TRUE(info.buf);
       CHECK_TRUE(info.buf_size > 0);
       CHECK_TRUE(info.mime_type);
@@ -994,6 +994,14 @@ int main(int argc, char **argv) {
     } else {
       CHECK_FALSE(c_simple_http_is_xdg_mime_available());
     }
+
+    C_SIMPLE_HTTP_StaticFileInfo info = c_simple_http_get_file(".", argv[0], 1);
+    CHECK_TRUE(info.buf);
+    CHECK_TRUE(info.buf_size > 0);
+    CHECK_TRUE(info.mime_type);
+    CHECK_TRUE(info.result == STATIC_FILE_RESULT_OK);
+    CHECK_STREQ(info.mime_type, "application/octet-stream");
+    c_simple_http_cleanup_static_file_info(&info);
   }
 
   RETURN()

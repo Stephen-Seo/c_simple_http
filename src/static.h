@@ -41,8 +41,10 @@ int_fast8_t c_simple_http_is_xdg_mime_available(void);
 void c_simple_http_cleanup_static_file_info(
   C_SIMPLE_HTTP_StaticFileInfo *file_info);
 
+/// If ignore_mime_type is non-zero, then mime information will not be fetched.
+/// The mime_type string will therefore default to "application/octet-stream".
 C_SIMPLE_HTTP_StaticFileInfo c_simple_http_get_file(
-  const char *static_dir, const char *path);
+  const char *static_dir, const char *path, int_fast8_t ignore_mime_type);
 
 #endif
 
