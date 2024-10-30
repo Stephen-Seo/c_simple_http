@@ -450,6 +450,8 @@ int main(int argc, char **argv) {
             response_code = C_SIMPLE_HTTP_Response_500_Internal_Server_Error;
           } else if (file_info.result == STATIC_FILE_RESULT_InvalidParameter) {
             response_code = C_SIMPLE_HTTP_Response_400_Bad_Request;
+          } else if (file_info.result == STATIC_FILE_RESULT_404NotFound) {
+            response_code = C_SIMPLE_HTTP_Response_404_Not_Found;
           } else {
             response_code = C_SIMPLE_HTTP_Response_500_Internal_Server_Error;
           }

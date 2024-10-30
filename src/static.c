@@ -56,7 +56,7 @@ void internal_cleanup_prev_cwd(char **path) {
   if (path && *path) {
     int ret = chdir(*path);
     if (ret != 0) {
-      fprintf(stderr, "WARNING: chdir back to cwd failed! (errno %d)\n", errno);
+      fprintf(stderr, "WARNING chdir back to cwd failed! (errno %d)\n", errno);
     }
     free(*path);
     *path = NULL;
@@ -151,7 +151,7 @@ C_SIMPLE_HTTP_StaticFileInfo c_simple_http_get_file(
   int ret = chdir(static_dir);
   if (ret != 0) {
     fprintf(stderr,
-            "ERROR: Failed to chdir into \"%s\"! (errno %d)\n",
+            "ERROR Failed to chdir into \"%s\"! (errno %d)\n",
             static_dir,
             errno);
     file_info.result = STATIC_FILE_RESULT_InternalError;
@@ -168,7 +168,7 @@ C_SIMPLE_HTTP_StaticFileInfo c_simple_http_get_file(
       }
     }
     if (path[idx] == 0) {
-      fprintf(stderr, "ERROR: Received invalid path \"%s\"!\n", path);
+      fprintf(stderr, "ERROR Received invalid path \"%s\"!\n", path);
       file_info.result = STATIC_FILE_RESULT_InvalidParameter;
       return file_info;
     }
@@ -176,15 +176,16 @@ C_SIMPLE_HTTP_StaticFileInfo c_simple_http_get_file(
   fd = fopen(path + idx, "rb");
 
   if (fd == NULL) {
-    fprintf(stderr, "ERROR: Failed to open path \"%s\"!\n", path + idx);
-    file_info.result = STATIC_FILE_RESULT_FileError;
+    fprintf(
+      stderr, "WARNING Failed to open path \"%s\" in static dir!\n", path + idx);
+    file_info.result = STATIC_FILE_RESULT_404NotFound;
     return file_info;
   }
 
   fseek(fd, 0, SEEK_END);
   long long_ret = ftell(fd);
   if (long_ret < 0) {
-    fprintf(stderr, "ERROR: Failed to seek in path fd \"%s\"!\n", path);
+    fprintf(stderr, "ERROR Failed to seek in path fd \"%s\"!\n", path);
     file_info.result = STATIC_FILE_RESULT_FileError;
     return file_info;
   }
@@ -193,7 +194,7 @@ C_SIMPLE_HTTP_StaticFileInfo c_simple_http_get_file(
   file_info.buf = malloc(file_info.buf_size);
   size_t size_t_ret = fread(file_info.buf, 1, file_info.buf_size, fd);
   if (size_t_ret != file_info.buf_size) {
-    fprintf(stderr, "ERROR: Failed to read path fd \"%s\"!\n", path);
+    fprintf(stderr, "ERROR Failed to read path fd \"%s\"!\n", path);
     free(file_info.buf);
     file_info.buf_size = 0;
     file_info.result = STATIC_FILE_RESULT_FileError;

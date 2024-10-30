@@ -25,7 +25,8 @@ typedef enum C_SIMPLE_HTTP_StaticFileResult {
   STATIC_FILE_RESULT_FileError,
   STATIC_FILE_RESULT_InvalidParameter,
   STATIC_FILE_RESULT_NoXDGMimeAvailable,
-  STATIC_FILE_RESULT_InternalError
+  STATIC_FILE_RESULT_InternalError,
+  STATIC_FILE_RESULT_404NotFound
 } C_SIMPLE_HTTP_StaticFileResult;
 
 typedef struct C_SIMPLE_HTTP_StaticFileInfo {
