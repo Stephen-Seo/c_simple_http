@@ -1004,6 +1004,11 @@ int main(int argc, char **argv) {
     CHECK_TRUE(info.result == STATIC_FILE_RESULT_OK);
     CHECK_STREQ(info.mime_type, "application/octet-stream");
     c_simple_http_cleanup_static_file_info(&info);
+
+    CHECK_TRUE(c_simple_http_static_validate_path("../derp") != 0);
+    CHECK_TRUE(c_simple_http_static_validate_path("./derp") == 0);
+    CHECK_TRUE(c_simple_http_static_validate_path("./../derp") != 0);
+    CHECK_TRUE(c_simple_http_static_validate_path("/derp/..") != 0);
   }
 
   RETURN()

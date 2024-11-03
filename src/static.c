@@ -304,10 +304,26 @@ C_SIMPLE_HTTP_StaticFileInfo c_simple_http_get_file(
 
 int c_simple_http_static_validate_path(const char *path) {
   uint64_t length = strlen(path);
+
+  if (length >= 3 && path[0] == '.' && path[1] == '.' && path[2] == '/') {
+    // Starts with "..", invalid.
+    return 1;
+  }
+
   for (uint64_t idx = 0; idx <= length && path[idx] != 0; ++idx) {
-    if (length - idx >= 2) {
-      if (path[idx] == '.' && path[idx + 1] == '.') {
+    if (length - idx >= 4) {
+      if (path[idx] == '/'
+          && path[idx + 1] == '.'
+          && path[idx + 2] == '.'
+          && path[idx + 3] == '/') {
         // Contains "..", invalid.
+        return 1;
+      }
+    } else if (length - idx == 3) {
+      if (path[idx] == '/'
+          && path[idx + 1] == '.'
+          && path[idx + 2] == '.') {
+        // Ends with "..", invalid.
         return 1;
       }
     }
