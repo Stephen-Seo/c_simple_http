@@ -26,7 +26,8 @@ typedef enum C_SIMPLE_HTTP_StaticFileResult {
   STATIC_FILE_RESULT_InvalidParameter,
   STATIC_FILE_RESULT_NoXDGMimeAvailable,
   STATIC_FILE_RESULT_InternalError,
-  STATIC_FILE_RESULT_404NotFound
+  STATIC_FILE_RESULT_404NotFound,
+  STATIC_FILE_RESULT_InvalidPath
 } C_SIMPLE_HTTP_StaticFileResult;
 
 typedef struct C_SIMPLE_HTTP_StaticFileInfo {
@@ -46,6 +47,9 @@ void c_simple_http_cleanup_static_file_info(
 /// The mime_type string will therefore default to "application/octet-stream".
 C_SIMPLE_HTTP_StaticFileInfo c_simple_http_get_file(
   const char *static_dir, const char *path, int_fast8_t ignore_mime_type);
+
+/// Returns zero if OK.
+int c_simple_http_static_validate_path(const char *path);
 
 #endif
 

@@ -120,6 +120,9 @@ C_SIMPLE_HTTP_StaticFileInfo c_simple_http_get_file(
   } else if (!ignore_mime_type && !c_simple_http_is_xdg_mime_available()) {
     file_info.result = STATIC_FILE_RESULT_NoXDGMimeAvailable;
     return file_info;
+  } else if (c_simple_http_static_validate_path(path) != 0) {
+    file_info.result = STATIC_FILE_RESULT_InvalidPath;
+    return file_info;
   }
 
   uint64_t buf_size = 128;
@@ -296,6 +299,19 @@ C_SIMPLE_HTTP_StaticFileInfo c_simple_http_get_file(
 
   file_info.result = STATIC_FILE_RESULT_OK;
   return file_info;
+}
+
+int c_simple_http_static_validate_path(const char *path) {
+  uint64_t length = strlen(path);
+  for (uint64_t idx = 0; idx <= length && path[idx] != 0; ++idx) {
+    if (length - idx >= 2) {
+      if (path[idx] == '.' && path[idx + 1] == '.') {
+        // Contains "..", invalid.
+        return 1;
+      }
+    }
+  }
+  return 0;
 }
 
 // vim: et ts=2 sts=2 sw=2
