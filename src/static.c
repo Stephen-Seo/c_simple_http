@@ -199,6 +199,7 @@ C_SIMPLE_HTTP_StaticFileInfo c_simple_http_get_file(
   if (size_t_ret != file_info.buf_size) {
     fprintf(stderr, "ERROR Failed to read path fd \"%s\"!\n", path);
     free(file_info.buf);
+    file_info.buf = NULL;
     file_info.buf_size = 0;
     file_info.result = STATIC_FILE_RESULT_FileError;
     return file_info;
