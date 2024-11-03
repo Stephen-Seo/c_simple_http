@@ -29,6 +29,7 @@
 #include <errno.h>
 #include <sys/inotify.h>
 #include <linux/limits.h>
+#include <fcntl.h>
 
 // Third party includes.
 #include <SimpleArchiver/src/helpers.h>
@@ -352,13 +353,48 @@ int main(int argc, char **argv) {
         printf("Peer connected.\n");
       }
       int connection_fd = ret;
-      read_ret = read(connection_fd, recv_buf, C_SIMPLE_HTTP_RECV_BUF_SIZE);
-      if (read_ret < 0) {
+
+      // Set non-blocking.
+      ret = fcntl(connection_fd, F_SETFL, O_NONBLOCK);
+      if (ret < 0) {
+        fprintf(stderr, "ERROR Failed to set non-blocking on connection fd!\n");
         close(connection_fd);
-        fprintf(
-          stderr,
-          "WARNING Failed to read from new connection, closing...\n");
         continue;
+      }
+
+      {
+        const struct timespec non_block_wait_time =
+          (struct timespec){.tv_sec = 0,
+                            .tv_nsec = C_SIMPLE_HTTP_NONBLOCK_SLEEP_NANOS};
+        uint64_t nanoseconds_waited = 0;
+        int_fast8_t continue_after = 0;
+        while (1) {
+          read_ret = read(connection_fd, recv_buf, C_SIMPLE_HTTP_RECV_BUF_SIZE);
+          if (read_ret < 0) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+              nanosleep(&non_block_wait_time, NULL);
+              nanoseconds_waited += (uint64_t)non_block_wait_time.tv_nsec;
+              if (nanoseconds_waited >= C_SIMPLE_HTTP_MAX_NONBLOCK_WAIT_NANOS) {
+                fprintf(stderr, "WARNING Connection timed out!\n");
+                close(connection_fd);
+                continue_after = 1;
+                break;
+              }
+              continue;
+            }
+            close(connection_fd);
+            fprintf(
+              stderr,
+              "WARNING Failed to read from new connection, closing...\n");
+            continue_after = 1;
+            break;
+          } else {
+            break;
+          }
+        }
+        if (continue_after) {
+          continue;
+        }
       }
 #ifndef NDEBUG
       // DEBUG print received buf.
