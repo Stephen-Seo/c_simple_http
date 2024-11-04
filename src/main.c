@@ -37,6 +37,7 @@
 // Local includes.
 #include "arg_parse.h"
 #include "big_endian.h"
+#include "config.h"
 #include "tcp_socket.h"
 #include "signal_handling.h"
 #include "globals.h"
@@ -45,19 +46,55 @@
 #include "helpers.h"
 #include "static.h"
 
-#define CHECK_ERROR_WRITE(write_expr) \
+#define CHECK_ERROR_WRITE(connection_fd, write_expr) \
   if (write_expr < 0) { \
     close(connection_fd); \
     fprintf(stderr, "ERROR Failed to write to connected peer, closing...\n"); \
     return 1; \
   }
 
-#define CHECK_ERROR_WRITE_CONTINUE(write_expr) \
-  if (write_expr < 0) { \
-    close(connection_fd); \
-    fprintf(stderr, "ERROR Failed to write to connected peer, closing...\n"); \
-    continue; \
+void c_simple_http_print_ipv6_addr(FILE *out, const struct in6_addr *addr) {
+  for (uint32_t idx = 0; idx < 16; ++idx) {
+    if (idx % 2 == 0 && idx > 0) {
+      fprintf(out, ":");
+    }
+    fprintf(out, "%02x", addr->s6_addr[idx]);
   }
+}
+
+typedef struct ConnectionItem {
+  int fd;
+  struct timespec time_point;
+  struct in6_addr peer_addr;
+} ConnectionItem;
+
+typedef struct ConnectionContext {
+  char *buf;
+  const Args *args;
+  C_SIMPLE_HTTP_ParsedConfig *parsed;
+} ConnectionContext;
+
+void c_simple_http_cleanup_connection_item(void *data) {
+  ConnectionItem *citem = data;
+  if (citem) {
+#ifndef NDEBUG
+    fprintf(stderr, "Closed connection to peer ");
+    c_simple_http_print_ipv6_addr(stderr, &citem->peer_addr);
+#endif
+    if (citem->fd >= 0) {
+      close(citem->fd);
+#ifndef NDEBUG
+      fprintf(stderr, ", fd %d\n", citem->fd);
+#endif
+      citem->fd = -1;
+    } else {
+#ifndef NDEBUG
+      fprintf(stderr, "\n");
+#endif
+    }
+    free(citem);
+  }
+}
 
 int c_simple_http_headers_check_print(void *data, void *ud) {
   SDArchiverHashMap *headers_map = ud;
@@ -92,20 +129,202 @@ int c_simple_http_on_error(
   size_t response_size;
   if (response) {
     response_size = strlen(response);
-    CHECK_ERROR_WRITE(write(connection_fd, response, response_size));
+    CHECK_ERROR_WRITE(connection_fd,
+                      write(connection_fd, response, response_size));
   } else {
-    CHECK_ERROR_WRITE(write(
+    CHECK_ERROR_WRITE(connection_fd, write(
       connection_fd, "HTTP/1.1 500 Internal Server Error\n", 35));
-    CHECK_ERROR_WRITE(write(connection_fd, "Allow: GET\n", 11));
-    CHECK_ERROR_WRITE(write(connection_fd, "Connection: close\n", 18));
-    CHECK_ERROR_WRITE(write(
-      connection_fd, "Content-Type: text/html\n", 24));
-    CHECK_ERROR_WRITE(write(connection_fd, "Content-Length: 35\n", 19));
-    CHECK_ERROR_WRITE(write(
-      connection_fd, "\n<h1>500 Internal Server Error</h1>\n", 36));
+    CHECK_ERROR_WRITE(connection_fd, write(connection_fd, "Allow: GET\n", 11));
+    CHECK_ERROR_WRITE(connection_fd,
+                      write(connection_fd, "Connection: close\n", 18));
+    CHECK_ERROR_WRITE(connection_fd,
+                      write(connection_fd, "Content-Type: text/html\n", 24));
+    CHECK_ERROR_WRITE(connection_fd,
+                      write(connection_fd, "Content-Length: 35\n", 19));
+    CHECK_ERROR_WRITE(connection_fd,
+                      write(connection_fd,
+                            "\n<h1>500 Internal Server Error</h1>\n",
+                            36));
   }
 
   return 0;
+}
+
+int c_simple_http_manage_connections(void *data, void *ud) {
+  ConnectionItem *citem = data;
+  ConnectionContext *ctx = ud;
+  char *recv_buf = ctx->buf;
+  const Args *args = ctx->args;
+  C_SIMPLE_HTTP_ParsedConfig *parsed = ctx->parsed;
+
+  struct timespec current_monotonic;
+  clock_gettime(CLOCK_MONOTONIC, &current_monotonic);
+  if (current_monotonic.tv_sec - citem->time_point.tv_sec
+      >= C_SIMPLE_HTTP_CONNECTION_TIMEOUT_SECONDS) {
+    fprintf(stderr, "Peer ");
+    c_simple_http_print_ipv6_addr(stderr, &citem->peer_addr);
+    fprintf(stderr, " timed out.\n");
+    return 1;
+  }
+
+  ssize_t read_ret = read(citem->fd, recv_buf, C_SIMPLE_HTTP_RECV_BUF_SIZE);
+  if (read_ret < 0) {
+    if (errno == EAGAIN || errno == EWOULDBLOCK) {
+      return 0;
+    } else {
+      fprintf(stderr, "Peer ");
+      c_simple_http_print_ipv6_addr(stderr, &citem->peer_addr);
+      fprintf(stderr, " error.\n");
+      return 1;
+    }
+  }
+
+#ifndef NDEBUG
+  // DEBUG print received buf.
+  for (uint32_t idx = 0;
+      idx < C_SIMPLE_HTTP_RECV_BUF_SIZE && idx < read_ret;
+      ++idx) {
+    if ((recv_buf[idx] >= 0x20 && recv_buf[idx] <= 0x7E)
+        || recv_buf[idx] == '\n' || recv_buf[idx] == '\r') {
+      printf("%c", recv_buf[idx]);
+    } else {
+      break;
+    }
+  }
+  puts("");
+#endif
+  {
+    SDArchiverHashMap *headers_map = c_simple_http_request_to_headers_map(
+      (const char*)recv_buf,
+      (size_t)read_ret);
+    simple_archiver_list_get(
+      args->list_of_headers_to_log,
+      c_simple_http_headers_check_print,
+      headers_map);
+    simple_archiver_hash_map_free(&headers_map);
+  }
+
+  size_t response_size = 0;
+  enum C_SIMPLE_HTTP_ResponseCode response_code;
+  __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
+  char *request_path = NULL;
+  __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
+  char *response = c_simple_http_request_response(
+    (const char*)recv_buf,
+    (uint32_t)read_ret,
+    parsed,
+    &response_size,
+    &response_code,
+    args,
+    &request_path);
+  if (response && response_code == C_SIMPLE_HTTP_Response_200_OK) {
+    CHECK_ERROR_WRITE(citem->fd, write(
+      citem->fd, "HTTP/1.1 200 OK\n", 16));
+    CHECK_ERROR_WRITE(citem->fd, write(citem->fd, "Allow: GET\n", 11));
+    CHECK_ERROR_WRITE(citem->fd, write(
+      citem->fd, "Connection: close\n", 18));
+    CHECK_ERROR_WRITE(citem->fd, write(
+      citem->fd, "Content-Type: text/html\n", 24));
+    char content_length_buf[128];
+    size_t content_length_buf_size = 0;
+    memcpy(content_length_buf, "Content-Length: ", 16);
+    content_length_buf_size = 16;
+    int32_t written = 0;
+    snprintf(
+      content_length_buf + content_length_buf_size,
+      127 - content_length_buf_size,
+      "%lu\n%n",
+      response_size,
+      &written);
+    if (written <= 0) {
+      close(citem->fd);
+      fprintf(
+        stderr,
+        "WARNING Failed to write in response, closing connection...\n");
+      return 1;
+    }
+    content_length_buf_size += (size_t)written;
+    CHECK_ERROR_WRITE(citem->fd, write(
+      citem->fd, content_length_buf, content_length_buf_size));
+    CHECK_ERROR_WRITE(citem->fd, write(citem->fd, "\n", 1));
+    CHECK_ERROR_WRITE(citem->fd, write(
+      citem->fd, response, response_size));
+  } else if (
+      response_code == C_SIMPLE_HTTP_Response_404_Not_Found
+      && args->static_dir) {
+    __attribute__((cleanup(c_simple_http_cleanup_static_file_info)))
+    C_SIMPLE_HTTP_StaticFileInfo file_info =
+      c_simple_http_get_file(args->static_dir, request_path, 0);
+    if (file_info.result == STATIC_FILE_RESULT_NoXDGMimeAvailable) {
+      file_info = c_simple_http_get_file(args->static_dir, request_path, 1);
+    }
+
+    if (file_info.result != STATIC_FILE_RESULT_OK
+        || !file_info.buf
+        || file_info.buf_size == 0
+        || !file_info.mime_type) {
+      if (file_info.result == STATIC_FILE_RESULT_FileError
+          || file_info.result == STATIC_FILE_RESULT_InternalError) {
+        response_code = C_SIMPLE_HTTP_Response_500_Internal_Server_Error;
+      } else if (file_info.result == STATIC_FILE_RESULT_InvalidParameter) {
+        response_code = C_SIMPLE_HTTP_Response_400_Bad_Request;
+      } else if (file_info.result == STATIC_FILE_RESULT_404NotFound) {
+        response_code = C_SIMPLE_HTTP_Response_404_Not_Found;
+      } else if (file_info.result == STATIC_FILE_RESULT_InvalidPath) {
+        response_code = C_SIMPLE_HTTP_Response_400_Bad_Request;
+      } else {
+        response_code = C_SIMPLE_HTTP_Response_500_Internal_Server_Error;
+      }
+
+      c_simple_http_on_error(response_code, citem->fd);
+      return 1;
+    } else {
+      CHECK_ERROR_WRITE(citem->fd, write(
+        citem->fd, "HTTP/1.1 200 OK\n", 16));
+      CHECK_ERROR_WRITE(citem->fd, write(citem->fd, "Allow: GET\n", 11));
+      CHECK_ERROR_WRITE(citem->fd, write(
+        citem->fd, "Connection: close\n", 18));
+      uint64_t mime_length = strlen(file_info.mime_type);
+      __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
+      char *mime_type_buf = malloc(mime_length + 1 + 14 + 1);
+      snprintf(
+        mime_type_buf,
+        mime_length + 1 + 14 + 1,
+        "Content-Type: %s\n",
+        file_info.mime_type);
+      CHECK_ERROR_WRITE(citem->fd, write(
+        citem->fd, mime_type_buf, mime_length + 1 + 14));
+      uint64_t content_str_len = 0;
+      for(uint64_t buf_size_temp = file_info.buf_size;
+          buf_size_temp > 0;
+          buf_size_temp /= 10) {
+        ++content_str_len;
+      }
+      if (content_str_len == 0) {
+        content_str_len = 1;
+      }
+      __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
+      char *content_length_buf = malloc(content_str_len + 1 + 16 + 1);
+      snprintf(
+        content_length_buf,
+        content_str_len + 1 + 16 + 1,
+        "Content-Length: %lu\n",
+        file_info.buf_size);
+      CHECK_ERROR_WRITE(citem->fd, write(
+        citem->fd, content_length_buf, content_str_len + 1 + 16));
+      CHECK_ERROR_WRITE(citem->fd, write(citem->fd, "\n", 1));
+      CHECK_ERROR_WRITE(citem->fd, write(
+        citem->fd, file_info.buf, file_info.buf_size));
+      fprintf(stderr,
+              "NOTICE Found static file for path \"%s\"\n",
+              request_path);
+    }
+  } else {
+    c_simple_http_on_error(response_code, citem->fd);
+    return 1;
+  }
+
+  return 1;
 }
 
 int main(int argc, char **argv) {
@@ -186,10 +405,19 @@ int main(int argc, char **argv) {
   memset(&peer_info, 0, sizeof(struct sockaddr_in6));
   peer_info.sin6_family = AF_INET6;
 
+  __attribute__((cleanup(simple_archiver_list_free)))
+  SDArchiverLinkedList *connections = simple_archiver_list_init();
+
+  char recv_buf[C_SIMPLE_HTTP_RECV_BUF_SIZE];
+
+  ConnectionContext connection_context;
+  connection_context.buf = recv_buf;
+  connection_context.args = &args;
+  connection_context.parsed = &parsed_config;
+
   signal(SIGINT, C_SIMPLE_HTTP_handle_sigint);
   signal(SIGUSR1, C_SIMPLE_HTTP_handle_sigusr1);
-
-  unsigned char recv_buf[C_SIMPLE_HTTP_RECV_BUF_SIZE];
+  signal(SIGPIPE, C_SIMPLE_HTTP_handle_sigpipe);
 
   int ret;
   ssize_t read_ret;
@@ -342,13 +570,8 @@ int main(int argc, char **argv) {
       // Received connection, handle it.
       if ((args.flags & 1) == 0) {
         printf("Peer connected: addr is ");
-        for (uint32_t idx = 0; idx < 16; ++idx) {
-          if (idx % 2 == 0 && idx > 0) {
-            printf(":");
-          }
-          printf("%02x", peer_info.sin6_addr.s6_addr[idx]);
-        }
-        puts("");
+        c_simple_http_print_ipv6_addr(stdout, &peer_info.sin6_addr);
+        printf(", fd is %d\n", ret);
       } else {
         printf("Peer connected.\n");
       }
@@ -362,191 +585,21 @@ int main(int argc, char **argv) {
         continue;
       }
 
-      {
-        const struct timespec non_block_wait_time =
-          (struct timespec){.tv_sec = 0,
-                            .tv_nsec = C_SIMPLE_HTTP_NONBLOCK_SLEEP_NANOS};
-        uint64_t nanoseconds_waited = 0;
-        int_fast8_t continue_after = 0;
-        while (1) {
-          read_ret = read(connection_fd, recv_buf, C_SIMPLE_HTTP_RECV_BUF_SIZE);
-          if (read_ret < 0) {
-            if (errno == EAGAIN || errno == EWOULDBLOCK) {
-              nanosleep(&non_block_wait_time, NULL);
-              nanoseconds_waited += (uint64_t)non_block_wait_time.tv_nsec;
-              if (nanoseconds_waited >= C_SIMPLE_HTTP_MAX_NONBLOCK_WAIT_NANOS) {
-                fprintf(stderr, "WARNING Connection timed out!\n");
-                close(connection_fd);
-                continue_after = 1;
-                break;
-              }
-              continue;
-            }
-            close(connection_fd);
-            fprintf(
-              stderr,
-              "WARNING Failed to read from new connection, closing...\n");
-            continue_after = 1;
-            break;
-          } else {
-            break;
-          }
-        }
-        if (continue_after) {
-          continue;
-        }
-      }
-#ifndef NDEBUG
-      // DEBUG print received buf.
-      for (uint32_t idx = 0;
-          idx < C_SIMPLE_HTTP_RECV_BUF_SIZE && idx < read_ret;
-          ++idx) {
-        if ((recv_buf[idx] >= 0x20 && recv_buf[idx] <= 0x7E)
-            || recv_buf[idx] == '\n' || recv_buf[idx] == '\r') {
-          printf("%c", recv_buf[idx]);
-        } else {
-          break;
-        }
-      }
-      puts("");
-#endif
-      {
-        SDArchiverHashMap *headers_map = c_simple_http_request_to_headers_map(
-          (const char*)recv_buf,
-          (size_t)read_ret);
-        simple_archiver_list_get(
-          args.list_of_headers_to_log,
-          c_simple_http_headers_check_print,
-          headers_map);
-        simple_archiver_hash_map_free(&headers_map);
-      }
-
-      size_t response_size = 0;
-      enum C_SIMPLE_HTTP_ResponseCode response_code;
-      __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
-      char *request_path = NULL;
-      const char *response = c_simple_http_request_response(
-        (const char*)recv_buf,
-        (uint32_t)read_ret,
-        &parsed_config,
-        &response_size,
-        &response_code,
-        &args,
-        &request_path);
-      if (response && response_code == C_SIMPLE_HTTP_Response_200_OK) {
-        CHECK_ERROR_WRITE_CONTINUE(write(
-          connection_fd, "HTTP/1.1 200 OK\n", 16));
-        CHECK_ERROR_WRITE_CONTINUE(write(connection_fd, "Allow: GET\n", 11));
-        CHECK_ERROR_WRITE_CONTINUE(write(
-          connection_fd, "Connection: close\n", 18));
-        CHECK_ERROR_WRITE_CONTINUE(write(
-          connection_fd, "Content-Type: text/html\n", 24));
-        char content_length_buf[128];
-        size_t content_length_buf_size = 0;
-        memcpy(content_length_buf, "Content-Length: ", 16);
-        content_length_buf_size = 16;
-        int32_t written = 0;
-        snprintf(
-          content_length_buf + content_length_buf_size,
-          127 - content_length_buf_size,
-          "%lu\n%n",
-          response_size,
-          &written);
-        if (written <= 0) {
-          close(connection_fd);
-          fprintf(
-            stderr,
-            "WARNING Failed to write in response, closing connection...\n");
-          continue;
-        }
-        content_length_buf_size += (size_t)written;
-        CHECK_ERROR_WRITE_CONTINUE(write(
-          connection_fd, content_length_buf, content_length_buf_size));
-        CHECK_ERROR_WRITE_CONTINUE(write(connection_fd, "\n", 1));
-        CHECK_ERROR_WRITE_CONTINUE(write(
-          connection_fd, response, response_size));
-
-        free((void*)response);
-      } else if (
-          response_code == C_SIMPLE_HTTP_Response_404_Not_Found
-          && args.static_dir) {
-        __attribute__((cleanup(c_simple_http_cleanup_static_file_info)))
-        C_SIMPLE_HTTP_StaticFileInfo file_info =
-          c_simple_http_get_file(args.static_dir, request_path, 0);
-        if (file_info.result == STATIC_FILE_RESULT_NoXDGMimeAvailable) {
-          file_info = c_simple_http_get_file(args.static_dir, request_path, 1);
-        }
-
-        if (file_info.result != STATIC_FILE_RESULT_OK
-            || !file_info.buf
-            || file_info.buf_size == 0
-            || !file_info.mime_type) {
-          if (file_info.result == STATIC_FILE_RESULT_FileError
-              || file_info.result == STATIC_FILE_RESULT_InternalError) {
-            response_code = C_SIMPLE_HTTP_Response_500_Internal_Server_Error;
-          } else if (file_info.result == STATIC_FILE_RESULT_InvalidParameter) {
-            response_code = C_SIMPLE_HTTP_Response_400_Bad_Request;
-          } else if (file_info.result == STATIC_FILE_RESULT_404NotFound) {
-            response_code = C_SIMPLE_HTTP_Response_404_Not_Found;
-          } else if (file_info.result == STATIC_FILE_RESULT_InvalidPath) {
-            response_code = C_SIMPLE_HTTP_Response_400_Bad_Request;
-          } else {
-            response_code = C_SIMPLE_HTTP_Response_500_Internal_Server_Error;
-          }
-
-          if (c_simple_http_on_error(response_code, connection_fd)) {
-            continue;
-          }
-        } else {
-          CHECK_ERROR_WRITE_CONTINUE(write(
-            connection_fd, "HTTP/1.1 200 OK\n", 16));
-          CHECK_ERROR_WRITE_CONTINUE(write(connection_fd, "Allow: GET\n", 11));
-          CHECK_ERROR_WRITE_CONTINUE(write(
-            connection_fd, "Connection: close\n", 18));
-          uint64_t mime_length = strlen(file_info.mime_type);
-          __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
-          char *mime_type_buf = malloc(mime_length + 1 + 14 + 1);
-          snprintf(
-            mime_type_buf,
-            mime_length + 1 + 14 + 1,
-            "Content-Type: %s\n",
-            file_info.mime_type);
-          CHECK_ERROR_WRITE_CONTINUE(write(
-            connection_fd, mime_type_buf, mime_length + 1 + 14));
-          uint64_t content_str_len = 0;
-          for(uint64_t buf_size_temp = file_info.buf_size;
-              buf_size_temp > 0;
-              buf_size_temp /= 10) {
-            ++content_str_len;
-          }
-          if (content_str_len == 0) {
-            content_str_len = 1;
-          }
-          __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
-          char *content_length_buf = malloc(content_str_len + 1 + 16 + 1);
-          snprintf(
-            content_length_buf,
-            content_str_len + 1 + 16 + 1,
-            "Content-Length: %lu\n",
-            file_info.buf_size);
-          CHECK_ERROR_WRITE_CONTINUE(write(
-            connection_fd, content_length_buf, content_str_len + 1 + 16));
-          CHECK_ERROR_WRITE_CONTINUE(write(connection_fd, "\n", 1));
-          CHECK_ERROR_WRITE_CONTINUE(write(
-            connection_fd, file_info.buf, file_info.buf_size));
-          fprintf(stderr,
-                  "NOTICE Found static file for path \"%s\"\n",
-                  request_path);
-        }
-      } else {
-        if (c_simple_http_on_error(response_code, connection_fd)) {
-          continue;
-        }
-      }
-      close(connection_fd);
+      ConnectionItem *citem = malloc(sizeof(ConnectionItem));
+      memset(citem, 0, sizeof(ConnectionItem));
+      citem->fd = connection_fd;
+      ret = clock_gettime(CLOCK_MONOTONIC, &citem->time_point);
+      citem->peer_addr = peer_info.sin6_addr;
+      simple_archiver_list_add(connections,
+                               citem,
+                               c_simple_http_cleanup_connection_item);
     } else {
       printf("WARNING: accept: Unknown invalid state!\n");
     }
+
+    simple_archiver_list_remove(connections,
+                                c_simple_http_manage_connections,
+                                &connection_context);
 #ifndef NDEBUG
     //printf(".");
     //fflush(stdout);

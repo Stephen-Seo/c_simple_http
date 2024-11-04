@@ -19,6 +19,7 @@
 
 void C_SIMPLE_HTTP_handle_sigint(int signal);
 void C_SIMPLE_HTTP_handle_sigusr1(int signal);
+void C_SIMPLE_HTTP_handle_sigpipe(int signal);
 
 #endif
 

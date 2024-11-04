@@ -43,4 +43,12 @@ void C_SIMPLE_HTTP_handle_sigusr1(int signal) {
   }
 }
 
+void C_SIMPLE_HTTP_handle_sigpipe(int signal) {
+  if (signal == SIGPIPE) {
+#ifndef NDEBUG
+    fprintf(stderr, "WARNING Recieved SIGPIPE\n");
+#endif
+  }
+}
+
 // vim: et ts=2 sts=2 sw=2
