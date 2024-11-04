@@ -78,6 +78,7 @@ typedef struct ConnectionContext {
   char *buf;
   const Args *args;
   C_SIMPLE_HTTP_ParsedConfig *parsed;
+  struct timespec current_time;
 } ConnectionContext;
 
 void c_simple_http_cleanup_connection_item(void *data) {
@@ -163,9 +164,7 @@ int c_simple_http_manage_connections(void *data, void *ud) {
   const Args *args = ctx->args;
   C_SIMPLE_HTTP_ParsedConfig *parsed = ctx->parsed;
 
-  struct timespec current_monotonic;
-  clock_gettime(CLOCK_MONOTONIC, &current_monotonic);
-  if (current_monotonic.tv_sec - citem->time_point.tv_sec
+  if (ctx->current_time.tv_sec - citem->time_point.tv_sec
       >= C_SIMPLE_HTTP_CONNECTION_TIMEOUT_SECONDS) {
     fprintf(stderr, "Peer ");
     c_simple_http_print_ipv6_addr(stderr, &citem->peer_addr);
@@ -586,7 +585,6 @@ int main(int argc, char **argv) {
       }
 
       ConnectionItem *citem = malloc(sizeof(ConnectionItem));
-      memset(citem, 0, sizeof(ConnectionItem));
       citem->fd = connection_fd;
       ret = clock_gettime(CLOCK_MONOTONIC, &citem->time_point);
       citem->peer_addr = peer_info.sin6_addr;
@@ -597,6 +595,7 @@ int main(int argc, char **argv) {
       printf("WARNING: accept: Unknown invalid state!\n");
     }
 
+    clock_gettime(CLOCK_MONOTONIC, &connection_context.current_time);
     simple_archiver_list_remove(connections,
                                 c_simple_http_manage_connections,
                                 &connection_context);
