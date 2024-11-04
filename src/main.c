@@ -53,6 +53,12 @@
     return 1; \
   }
 
+#define CHECK_ERROR_WRITE_NO_FD(write_expr) \
+  if (write_expr < 0) { \
+    fprintf(stderr, "ERROR Failed to write to connected peer, closing...\n"); \
+    return 1; \
+  }
+
 void c_simple_http_print_ipv6_addr(FILE *out, const struct in6_addr *addr) {
   for (uint32_t idx = 0; idx < 16; ++idx) {
     if (idx % 2 == 0 && idx > 0) {
@@ -218,13 +224,10 @@ int c_simple_http_manage_connections(void *data, void *ud) {
     args,
     &request_path);
   if (response && response_code == C_SIMPLE_HTTP_Response_200_OK) {
-    CHECK_ERROR_WRITE(citem->fd, write(
-      citem->fd, "HTTP/1.1 200 OK\n", 16));
-    CHECK_ERROR_WRITE(citem->fd, write(citem->fd, "Allow: GET\n", 11));
-    CHECK_ERROR_WRITE(citem->fd, write(
-      citem->fd, "Connection: close\n", 18));
-    CHECK_ERROR_WRITE(citem->fd, write(
-      citem->fd, "Content-Type: text/html\n", 24));
+    CHECK_ERROR_WRITE_NO_FD(write(citem->fd, "HTTP/1.1 200 OK\n", 16));
+    CHECK_ERROR_WRITE_NO_FD(write(citem->fd, "Allow: GET\n", 11));
+    CHECK_ERROR_WRITE_NO_FD(write(citem->fd, "Connection: close\n", 18));
+    CHECK_ERROR_WRITE_NO_FD(write(citem->fd, "Content-Type: text/html\n", 24));
     char content_length_buf[128];
     size_t content_length_buf_size = 0;
     memcpy(content_length_buf, "Content-Length: ", 16);
@@ -244,11 +247,10 @@ int c_simple_http_manage_connections(void *data, void *ud) {
       return 1;
     }
     content_length_buf_size += (size_t)written;
-    CHECK_ERROR_WRITE(citem->fd, write(
+    CHECK_ERROR_WRITE_NO_FD(write(
       citem->fd, content_length_buf, content_length_buf_size));
-    CHECK_ERROR_WRITE(citem->fd, write(citem->fd, "\n", 1));
-    CHECK_ERROR_WRITE(citem->fd, write(
-      citem->fd, response, response_size));
+    CHECK_ERROR_WRITE_NO_FD(write(citem->fd, "\n", 1));
+    CHECK_ERROR_WRITE_NO_FD(write(citem->fd, response, response_size));
   } else if (
       response_code == C_SIMPLE_HTTP_Response_404_Not_Found
       && args->static_dir) {
@@ -279,11 +281,9 @@ int c_simple_http_manage_connections(void *data, void *ud) {
       c_simple_http_on_error(response_code, citem->fd);
       return 1;
     } else {
-      CHECK_ERROR_WRITE(citem->fd, write(
-        citem->fd, "HTTP/1.1 200 OK\n", 16));
-      CHECK_ERROR_WRITE(citem->fd, write(citem->fd, "Allow: GET\n", 11));
-      CHECK_ERROR_WRITE(citem->fd, write(
-        citem->fd, "Connection: close\n", 18));
+      CHECK_ERROR_WRITE_NO_FD(write(citem->fd, "HTTP/1.1 200 OK\n", 16));
+      CHECK_ERROR_WRITE_NO_FD(write(citem->fd, "Allow: GET\n", 11));
+      CHECK_ERROR_WRITE_NO_FD(write( citem->fd, "Connection: close\n", 18));
       uint64_t mime_length = strlen(file_info.mime_type);
       __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
       char *mime_type_buf = malloc(mime_length + 1 + 14 + 1);
@@ -292,7 +292,7 @@ int c_simple_http_manage_connections(void *data, void *ud) {
         mime_length + 1 + 14 + 1,
         "Content-Type: %s\n",
         file_info.mime_type);
-      CHECK_ERROR_WRITE(citem->fd, write(
+      CHECK_ERROR_WRITE_NO_FD(write(
         citem->fd, mime_type_buf, mime_length + 1 + 14));
       uint64_t content_str_len = 0;
       for(uint64_t buf_size_temp = file_info.buf_size;
@@ -310,10 +310,10 @@ int c_simple_http_manage_connections(void *data, void *ud) {
         content_str_len + 1 + 16 + 1,
         "Content-Length: %lu\n",
         file_info.buf_size);
-      CHECK_ERROR_WRITE(citem->fd, write(
+      CHECK_ERROR_WRITE_NO_FD(write(
         citem->fd, content_length_buf, content_str_len + 1 + 16));
-      CHECK_ERROR_WRITE(citem->fd, write(citem->fd, "\n", 1));
-      CHECK_ERROR_WRITE(citem->fd, write(
+      CHECK_ERROR_WRITE_NO_FD(write(citem->fd, "\n", 1));
+      CHECK_ERROR_WRITE_NO_FD(write(
         citem->fd, file_info.buf, file_info.buf_size));
       fprintf(stderr,
               "NOTICE Found static file for path \"%s\"\n",
