@@ -560,39 +560,45 @@ int main(int argc, char **argv) {
     }
 
     socket_len = sizeof(struct sockaddr_in6);
-    ret = accept(tcp_socket, (struct sockaddr *)&peer_info, &socket_len);
-    if (ret == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
-      // No connecting peers, do nothing.
-    } else if (ret == -1) {
-      printf("WARNING: accept: errno %d\n", errno);
-    } else if (ret >= 0) {
-      // Received connection, handle it.
-      if ((args.flags & 1) == 0) {
-        printf("Peer connected: addr is ");
-        c_simple_http_print_ipv6_addr(stdout, &peer_info.sin6_addr);
-        printf(", fd is %d\n", ret);
+    while (1) {
+      ret = accept(tcp_socket, (struct sockaddr *)&peer_info, &socket_len);
+      if (ret == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+        // No connecting peers, do nothing.
+        break;
+      } else if (ret == -1) {
+        printf("WARNING: accept: errno %d\n", errno);
+        break;
+      } else if (ret >= 0) {
+        // Received connection, handle it.
+        if ((args.flags & 1) == 0) {
+          printf("Peer connected: addr is ");
+          c_simple_http_print_ipv6_addr(stdout, &peer_info.sin6_addr);
+          printf(", fd is %d\n", ret);
+        } else {
+          printf("Peer connected.\n");
+        }
+        int connection_fd = ret;
+
+        // Set non-blocking.
+        ret = fcntl(connection_fd, F_SETFL, O_NONBLOCK);
+        if (ret < 0) {
+          fprintf(
+            stderr, "ERROR Failed to set non-blocking on connection fd!\n");
+          close(connection_fd);
+          continue;
+        }
+
+        ConnectionItem *citem = malloc(sizeof(ConnectionItem));
+        citem->fd = connection_fd;
+        ret = clock_gettime(CLOCK_MONOTONIC, &citem->time_point);
+        citem->peer_addr = peer_info.sin6_addr;
+        simple_archiver_list_add(connections,
+                                 citem,
+                                 c_simple_http_cleanup_connection_item);
       } else {
-        printf("Peer connected.\n");
+        printf("WARNING: accept: Unknown invalid state!\n");
+        break;
       }
-      int connection_fd = ret;
-
-      // Set non-blocking.
-      ret = fcntl(connection_fd, F_SETFL, O_NONBLOCK);
-      if (ret < 0) {
-        fprintf(stderr, "ERROR Failed to set non-blocking on connection fd!\n");
-        close(connection_fd);
-        continue;
-      }
-
-      ConnectionItem *citem = malloc(sizeof(ConnectionItem));
-      citem->fd = connection_fd;
-      ret = clock_gettime(CLOCK_MONOTONIC, &citem->time_point);
-      citem->peer_addr = peer_info.sin6_addr;
-      simple_archiver_list_add(connections,
-                               citem,
-                               c_simple_http_cleanup_connection_item);
-    } else {
-      printf("WARNING: accept: Unknown invalid state!\n");
     }
 
     clock_gettime(CLOCK_MONOTONIC, &connection_context.current_time);
