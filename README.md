@@ -16,6 +16,10 @@ A simple HTTP/1.1 server written in C.
       --cache-entry-lifetime-seconds=<SECONDS>
       --enable-static-dir=<DIR>
 
+## Changelog
+
+See the [Changelog.](https://git.seodisparate.com/stephenseo/c_simple_http/src/branch/main/Changelog.md)
+
 ## Before Compiling
 
 Make sure that the git submodule(s) are loaded:
