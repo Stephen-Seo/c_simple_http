@@ -232,8 +232,6 @@ int c_simple_http_helper_mkdir_tree(const char *path) {
     return 1;
   } else if (errno == ENOENT) {
     // Directory doesn't exist, create dir tree.
-    closedir(dir_ptr);
-
     size_t buf_size = strlen(path) + 1;
     char *buf = malloc(buf_size);
     memcpy(buf, path, buf_size - 1);
@@ -256,7 +254,6 @@ int c_simple_http_helper_mkdir_tree(const char *path) {
     return 0;
   } else {
     // Other directory error.
-    closedir(dir_ptr);
     return 2;
   }
 }
