@@ -1,6 +1,10 @@
 # Changelog
 
-## Latest Changes
+## Upcoming Changes
+
+Some refactoring of code handling parsing the config file.
+
+Remove buffer-size-limit on config file entries.
 
 ## Version 1.0
 
