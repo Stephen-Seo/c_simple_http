@@ -73,79 +73,63 @@ void c_simple_http_hash_map_wrapper_cleanup(
   free(wrapper);
 }
 
-/// Returns non-zero if config should be returned.
-int internal_single_quote_decrement(uint_fast8_t *single_quote_count,
-                                    uint32_t *state,
-                                    unsigned char *key_buf,
-                                    uint32_t *key_idx,
-                                    unsigned char *value_buf,
-                                    uint32_t *value_idx,
-                                    C_SIMPLE_HTTP_ParsedConfig *config) {
+void internal_single_quote_decrement(uint_fast8_t *single_quote_count,
+                                     uint32_t *state,
+                                     char **key_buf,
+                                     uint32_t *key_capacity,
+                                     uint32_t *key_idx,
+                                     char **value_buf,
+                                     uint32_t *value_capacity,
+                                     uint32_t *value_idx) {
   for(; (*single_quote_count) > 0; --(*single_quote_count)) {
     if (((*state) & 1) == 0) {
-      key_buf[(*key_idx)++] = '\'';
-      if ((*key_idx) >= C_SIMPLE_HTTP_CONFIG_BUF_SIZE) {
-        fprintf(stderr,
-                "ERROR: config file \"key\" is larger than %u bytes!\n",
-                C_SIMPLE_HTTP_CONFIG_BUF_SIZE - 1);
-        c_simple_http_clean_up_parsed_config(config);
-        config->hash_map = NULL;
-        return 1;
+      (*key_buf)[(*key_idx)++] = '\'';
+      if (*key_idx >= *key_capacity) {
+        (*key_capacity) *= 2;
+        (*key_buf) = realloc(*key_buf, *key_capacity);
       }
     } else {
-      value_buf[(*value_idx)++] = '\'';
-      if ((*value_idx) >= C_SIMPLE_HTTP_CONFIG_BUF_SIZE) {
-        fprintf(stderr,
-                "ERROR: config file \"value\" is larger than %u bytes!\n",
-                C_SIMPLE_HTTP_CONFIG_BUF_SIZE - 1);
-        c_simple_http_clean_up_parsed_config(config);
-        config->hash_map = NULL;
-        return 1;
+      (*value_buf)[(*value_idx)++] = '\'';
+      if ((*value_idx) >= *value_capacity) {
+        (*value_capacity) *= 2;
+        (*value_buf) = realloc(*value_buf, *value_capacity);
       }
     }
   }
-  return 0;
 }
 
-/// Returns non-zero if config should be returned.
-int internal_double_quote_decrement(uint_fast8_t *double_quote_count,
-                                    uint32_t *state,
-                                    unsigned char *key_buf,
-                                    uint32_t *key_idx,
-                                    unsigned char *value_buf,
-                                    uint32_t *value_idx,
-                                    C_SIMPLE_HTTP_ParsedConfig *config) {
+void internal_double_quote_decrement(uint_fast8_t *double_quote_count,
+                                     uint32_t *state,
+                                     char **key_buf,
+                                     uint32_t *key_capacity,
+                                     uint32_t *key_idx,
+                                     char **value_buf,
+                                     uint32_t *value_capacity,
+                                     uint32_t *value_idx) {
   for(; (*double_quote_count) > 0; --(*double_quote_count)) {
     if (((*state) & 1) == 0) {
-      key_buf[(*key_idx)++] = '"';
-      if ((*key_idx) >= C_SIMPLE_HTTP_CONFIG_BUF_SIZE) {
-        fprintf(stderr,
-                "ERROR: config file \"key\" is larger than %u bytes!\n",
-                C_SIMPLE_HTTP_CONFIG_BUF_SIZE - 1);
-        c_simple_http_clean_up_parsed_config(config);
-        config->hash_map = NULL;
-        return 1;
+      (*key_buf)[(*key_idx)++] = '"';
+      if ((*key_idx) >= (*key_capacity)) {
+        (*key_capacity) *= 2;
+        (*key_buf) = realloc(*key_buf, *key_capacity);
       }
     } else {
-      value_buf[(*value_idx)++] = '"';
-      if ((*value_idx) >= C_SIMPLE_HTTP_CONFIG_BUF_SIZE) {
-        fprintf(stderr,
-                "ERROR: config file \"value\" is larger than %u bytes!\n",
-                C_SIMPLE_HTTP_CONFIG_BUF_SIZE - 1);
-        c_simple_http_clean_up_parsed_config(config);
-        config->hash_map = NULL;
-        return 1;
+      (*value_buf)[(*value_idx)++] = '"';
+      if ((*value_idx) >= (*value_capacity)) {
+        (*value_capacity) *= 2;
+        (*value_buf) = realloc(*value_buf, *value_capacity);
       }
     }
   }
-  return 0;
 }
 
 /// Returns non-zero if config should be returned.
 int internal_check_add_value(uint32_t *state,
-                             unsigned char *key_buf,
+                             char **key_buf,
+                             uint32_t *key_capacity,
                              uint32_t *key_idx,
-                             unsigned char *value_buf,
+                             char **value_buf,
+                             uint32_t *value_capacity,
                              uint32_t *value_idx,
                              C_SIMPLE_HTTP_ParsedConfig *config,
                              const char *separating_key,
@@ -154,20 +138,17 @@ int internal_check_add_value(uint32_t *state,
                              SDArchiverLinkedList *paths,
                              char **current_separating_key_value,
                              uint32_t *current_separating_key_value_size) {
-  if ((*value_idx) < C_SIMPLE_HTTP_CONFIG_BUF_SIZE) {
-    value_buf[(*value_idx)++] = 0;
+  if ((*value_idx) < (*value_capacity)) {
+    (*value_buf)[(*value_idx)++] = 0;
   } else {
-    fprintf(stderr,
-            "ERROR: config file \"value\" is larger than %u bytes!\n",
-            C_SIMPLE_HTTP_CONFIG_BUF_SIZE - 1);
-    c_simple_http_clean_up_parsed_config(config);
-    config->hash_map = NULL;
-    return 1;
+    (*value_capacity) *= 2;
+    (*value_buf) = realloc(*value_buf, *value_capacity);
+    (*value_buf)[(*value_idx)++] = 0;
   }
   (*state) &= 0xFFFFFFFE;
 
   /* Check if key is separating_key. */
-  if (strcmp((char*)key_buf, separating_key) == 0) {
+  if (strcmp((*key_buf), separating_key) == 0) {
     if (*current_separating_key_value) {
       if (required_names) {
         C_SIMPLE_HTTP_HashMapWrapper *hash_map_wrapper =
@@ -201,14 +182,14 @@ int internal_check_add_value(uint32_t *state,
       free((*current_separating_key_value));
     }
     (*current_separating_key_value) = malloc((*value_idx));
-    memcpy((*current_separating_key_value), value_buf, (*value_idx));
+    memcpy((*current_separating_key_value), *value_buf, (*value_idx));
     (*current_separating_key_value_size) = (*value_idx);
     /* At this point, key is separating_key. */
     SDArchiverHashMap *hash_map = simple_archiver_hash_map_init();
     unsigned char *key = malloc(separating_key_size);
     strncpy((char*)key, separating_key, separating_key_size);
     unsigned char *value = malloc(*value_idx);
-    memcpy(value, value_buf, (*value_idx));
+    memcpy(value, *value_buf, (*value_idx));
     if (simple_archiver_hash_map_insert(hash_map,
                                         value,
                                         key,
@@ -270,9 +251,9 @@ int internal_check_add_value(uint32_t *state,
     }
 
     unsigned char *key = malloc(*key_idx);
-    memcpy(key, key_buf, *key_idx);
+    memcpy(key, *key_buf, *key_idx);
     unsigned char *value = malloc(*value_idx);
-    memcpy(value, value_buf, (*value_idx));
+    memcpy(value, *value_buf, (*value_idx));
 
     if (simple_archiver_hash_map_insert(hash_map_wrapper->paths,
                                         value,
@@ -352,8 +333,12 @@ C_SIMPLE_HTTP_ParsedConfig c_simple_http_parse_config(
     c_simple_http_clean_up_parsed_config(&config);
     return config;
   }
-  unsigned char key_buf[C_SIMPLE_HTTP_CONFIG_BUF_SIZE];
-  unsigned char value_buf[C_SIMPLE_HTTP_CONFIG_BUF_SIZE];
+  __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
+  char *key_buf = malloc(C_SIMPLE_HTTP_CONFIG_BUF_SIZE);
+  __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
+  char *value_buf = malloc(C_SIMPLE_HTTP_CONFIG_BUF_SIZE);
+  uint32_t key_capacity = C_SIMPLE_HTTP_CONFIG_BUF_SIZE;
+  uint32_t value_capacity = C_SIMPLE_HTTP_CONFIG_BUF_SIZE;
   uint32_t key_idx = 0;
   uint32_t value_idx = 0;
   __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
@@ -376,60 +361,55 @@ C_SIMPLE_HTTP_ParsedConfig c_simple_http_parse_config(
       break;
     } else if ((state & 0xC) == 0 && (c == ' ' || c == '\t')) {
       // Ignore whitespace when not quoted.
-      if (internal_single_quote_decrement(&single_quote_count,
-                                          &state,
-                                          key_buf,
-                                          &key_idx,
-                                          value_buf,
-                                          &value_idx,
-                                          &config)) {
-        return config;
-      }
-      if (internal_double_quote_decrement(&double_quote_count,
-                                          &state,
-                                          key_buf,
-                                          &key_idx,
-                                          value_buf,
-                                          &value_idx,
-                                          &config)) {
-        return config;
-      }
+      internal_single_quote_decrement(&single_quote_count,
+                                      &state,
+                                      &key_buf,
+                                      &key_capacity,
+                                      &key_idx,
+                                      &value_buf,
+                                      &value_capacity,
+                                      &value_idx);
+      internal_double_quote_decrement(&double_quote_count,
+                                      &state,
+                                      &key_buf,
+                                      &key_capacity,
+                                      &key_idx,
+                                      &value_buf,
+                                      &value_capacity,
+                                      &value_idx);
       continue;
     } else if ((state & 1) == 0
         && (state & 0xC) == 0
         && (c == '\r' || c == '\n')) {
       // Ignore newlines when parsing for key and when not quoted.
-      if (internal_single_quote_decrement(&single_quote_count,
-                                          &state,
-                                          key_buf,
-                                          &key_idx,
-                                          value_buf,
-                                          &value_idx,
-                                          &config)) {
-        return config;
-      }
-      if (internal_double_quote_decrement(&double_quote_count,
-                                          &state,
-                                          key_buf,
-                                          &key_idx,
-                                          value_buf,
-                                          &value_idx,
-                                          &config)) {
-        return config;
-      }
+      internal_single_quote_decrement(&single_quote_count,
+                                      &state,
+                                      &key_buf,
+                                      &key_capacity,
+                                      &key_idx,
+                                      &value_buf,
+                                      &value_capacity,
+                                      &value_idx);
+      internal_double_quote_decrement(&double_quote_count,
+                                      &state,
+                                      &key_buf,
+                                      &key_capacity,
+                                      &key_idx,
+                                      &value_buf,
+                                      &value_capacity,
+                                      &value_idx);
       continue;
     } else if ((state & 1) == 1) {
       if (c == '\'') {
         ++single_quote_count;
-        if (internal_double_quote_decrement(&double_quote_count,
-                                            &state,
-                                            key_buf,
-                                            &key_idx,
-                                            value_buf,
-                                            &value_idx,
-                                            &config)) {
-          return config;
-        }
+        internal_double_quote_decrement(&double_quote_count,
+                                        &state,
+                                        &key_buf,
+                                        &key_capacity,
+                                        &key_idx,
+                                        &value_buf,
+                                        &value_capacity,
+                                        &value_idx);
 
         if (((state & 0xC) == 0x4 || (state & 0xC) == 0)
             && single_quote_count >= C_SIMPLE_HTTP_QUOTE_COUNT_MAX) {
@@ -445,15 +425,14 @@ C_SIMPLE_HTTP_ParsedConfig c_simple_http_parse_config(
         continue;
       } else if (c == '"') {
         ++double_quote_count;
-        if (internal_single_quote_decrement(&single_quote_count,
-                                            &state,
-                                            key_buf,
-                                            &key_idx,
-                                            value_buf,
-                                            &value_idx,
-                                            &config)) {
-          return config;
-        }
+        internal_single_quote_decrement(&single_quote_count,
+                                        &state,
+                                        &key_buf,
+                                        &key_capacity,
+                                        &key_idx,
+                                        &value_buf,
+                                        &value_capacity,
+                                        &value_idx);
 
         if (((state & 0xC) == 0x8 || (state & 0xC) == 0)
             && double_quote_count >= C_SIMPLE_HTTP_QUOTE_COUNT_MAX) {
@@ -468,66 +447,59 @@ C_SIMPLE_HTTP_ParsedConfig c_simple_http_parse_config(
         }
         continue;
       } else {
-        if (internal_single_quote_decrement(&single_quote_count,
-                                            &state,
-                                            key_buf,
-                                            &key_idx,
-                                            value_buf,
-                                            &value_idx,
-                                            &config)) {
-          return config;
-        }
-        if (internal_double_quote_decrement(&double_quote_count,
-                                            &state,
-                                            key_buf,
-                                            &key_idx,
-                                            value_buf,
-                                            &value_idx,
-                                            &config)) {
-          return config;
-        }
+        internal_single_quote_decrement(&single_quote_count,
+                                        &state,
+                                        &key_buf,
+                                        &key_capacity,
+                                        &key_idx,
+                                        &value_buf,
+                                        &value_capacity,
+                                        &value_idx);
+        internal_double_quote_decrement(&double_quote_count,
+                                        &state,
+                                        &key_buf,
+                                        &key_capacity,
+                                        &key_idx,
+                                        &value_buf,
+                                        &value_capacity,
+                                        &value_idx);
       }
     }
     if ((state & 1) == 0) {
       if (c != '=') {
-        key_buf[key_idx++] = (unsigned char)c;
-        if (key_idx >= C_SIMPLE_HTTP_CONFIG_BUF_SIZE) {
-          fprintf(stderr,
-                  "ERROR: config file \"key\" is larger than %u bytes!\n",
-                  C_SIMPLE_HTTP_CONFIG_BUF_SIZE - 1);
-          c_simple_http_clean_up_parsed_config(&config);
-          config.hash_map = NULL;
-          return config;
+        key_buf[key_idx++] = (char)c;
+        if (key_idx >= key_capacity) {
+          key_capacity *= 2;
+          key_buf = realloc(key_buf, key_capacity);
         }
       } else {
-        if (key_idx < C_SIMPLE_HTTP_CONFIG_BUF_SIZE) {
+        if (key_idx < key_capacity) {
           key_buf[key_idx++] = 0;
+          if (key_idx >= key_capacity) {
+            key_capacity *= 2;
+            key_buf = realloc(key_buf, key_capacity);
+          }
         } else {
-          fprintf(stderr,
-                  "ERROR: config file \"key\" is larger than %u bytes!\n",
-                  C_SIMPLE_HTTP_CONFIG_BUF_SIZE - 1);
-          c_simple_http_clean_up_parsed_config(&config);
-          config.hash_map = NULL;
-          return config;
+          key_capacity *= 2;
+          key_buf = realloc(key_buf, key_capacity);
+          key_buf[key_idx++] = 0;
         }
         state |= 1;
       }
     } else if ((state & 1) == 1) {
       if ((c != '\n' && c != '\r') || (state & 0xC) != 0) {
-        value_buf[value_idx++] = (unsigned char)c;
-        if (value_idx >= C_SIMPLE_HTTP_CONFIG_BUF_SIZE) {
-          fprintf(stderr,
-                  "ERROR: config file \"value\" is larger than %u bytes!\n",
-                  C_SIMPLE_HTTP_CONFIG_BUF_SIZE - 1);
-          c_simple_http_clean_up_parsed_config(&config);
-          config.hash_map = NULL;
-          return config;
+        value_buf[value_idx++] = (char)c;
+        if (value_idx >= value_capacity) {
+          value_capacity *= 2;
+          value_buf = realloc(value_buf, value_capacity);
         }
       } else {
         if (internal_check_add_value(&state,
-                                     key_buf,
+                                     &key_buf,
+                                     &key_capacity,
                                      &key_idx,
-                                     value_buf,
+                                     &value_buf,
+                                     &value_capacity,
                                      &value_idx,
                                      &config,
                                      separating_key,
@@ -547,9 +519,11 @@ C_SIMPLE_HTTP_ParsedConfig c_simple_http_parse_config(
     // Leftover "value" not added yet.
 
     if (internal_check_add_value(&state,
-                                 key_buf,
+                                 &key_buf,
+                                 &key_capacity,
                                  &key_idx,
-                                 value_buf,
+                                 &value_buf,
+                                 &value_capacity,
                                  &value_idx,
                                  &config,
                                  separating_key,
