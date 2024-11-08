@@ -2,6 +2,8 @@
 
 ## Upcoming Changes
 
+## Version 1.1
+
 Some refactoring of code handling parsing the config file.
 
 Remove buffer-size-limit on config file entries.
