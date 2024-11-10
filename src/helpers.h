@@ -21,8 +21,22 @@
 #include <stddef.h>
 #include <stdint.h>
 
+// libc includes.
+#include <time.h>
+
+// Local includes.
+#include "config.h"
+#include "arg_parse.h"
+
 // Third-party includes.
 #include <SimpleArchiver/src/data_structures/linked_list.h>
+
+typedef struct ConnectionContext {
+  char *buf;
+  const Args *args;
+  C_SIMPLE_HTTP_ParsedConfig *parsed;
+  struct timespec current_time;
+} ConnectionContext;
 
 typedef struct C_SIMPLE_HTTP_String_Part {
   char *buf;
