@@ -450,6 +450,12 @@ int generate_paths_fn(const void *key,
 
   // Save the html.
   FILE *fd = fopen(generated_path, "wb");
+  if (!fd) {
+    fprintf(stderr,
+            "WARNING Failed to open \"%s\" for writing, skipping!\n",
+            generated_path);
+    return 0;
+  }
   unsigned long fwrite_ret = fwrite(html_buf, 1, html_buf_size, fd);
   if (fwrite_ret < html_buf_size) {
     fclose(fd);
