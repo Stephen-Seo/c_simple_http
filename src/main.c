@@ -356,7 +356,7 @@ int generate_paths_fn(const void *key,
   }
 
   // Append the path.
-  if (strcmp("path", "/") != 0) {
+  if (strcmp(path, "/") != 0) {
     // Is not root.
     uint32_t idx = 0;
     while (idx <= path_len && path[idx] == '/') {
