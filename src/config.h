@@ -25,6 +25,11 @@ typedef struct C_SIMPLE_HTTP_ParsedConfig {
   /// Each entry in this data structure is a hash map where its value for the
   /// key "PATH" is the path it represents. The "key" value should match the
   /// mentioned value for "PATH".
+  ///
+  /// An example mapping for this structure (based on current example config):
+  /// KEY: "/", VALUE: HashMapWrapper struct
+  /// KEY: "/inner", VALUE: HashMapWrapper struct
+  /// KEY: "/inner/further", VALUE: HashMapWrapper struct
   union {
     SDArchiverHashMap *paths;
     SDArchiverHashMap *hash_map;

@@ -44,6 +44,8 @@ void print_usage(void) {
   puts("  --enable-cache-dir=<DIR>");
   puts("  --cache-entry-lifetime-seconds=<SECONDS>");
   puts("  --enable-static-dir=<DIR>");
+  puts("  --generate-dir=<DIR>");
+  puts("  --generate-enable-overwrite");
 }
 
 Args parse_args(int32_t argc, char **argv) {
@@ -152,6 +154,39 @@ Args parse_args(int32_t argc, char **argv) {
         printf("Directory \"%s\" exists.\n", args.static_dir);
       }
       closedir(d);
+    } else if (strncmp(argv[0], "--generate-dir=", 15) == 0) {
+      args.generate_dir = argv[0] + 15;
+      // Check if it actually is an existing directory.
+      DIR *d = opendir(args.generate_dir);
+      if (d == NULL) {
+        if (errno == ENOENT) {
+          printf(
+            "Directory \"%s\" doesn't exist, creating it...\n",
+            args.generate_dir);
+          int ret = mkdir(
+              args.generate_dir,
+              S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
+          if (ret == -1) {
+            fprintf(
+              stderr,
+              "ERROR Failed to create new directory (errno %d)\n",
+              errno);
+            exit(1);
+          }
+        } else {
+          fprintf(
+            stderr,
+            "ERROR Failed to open directory \"%s\" (errno %d)!\n",
+            args.generate_dir,
+            errno);
+          exit(1);
+        }
+      } else {
+        printf("Directory \"%s\" exists.\n", args.generate_dir);
+      }
+      closedir(d);
+    } else if (strcmp(argv[0], "--generate-enable-overwrite") == 0) {
+      args.flags |= 4;
     } else {
       fprintf(stderr, "ERROR: Invalid args!\n");
       print_usage();

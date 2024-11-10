@@ -21,7 +21,10 @@
 #include <stdint.h>
 
 // Linux/Unix includes.
+#include <libgen.h>
 #include <sys/socket.h>
+#include <sys/types.h>
+#include <dirent.h>
 #include <netinet/in.h>
 #include <unistd.h>
 #include <signal.h>
@@ -33,11 +36,14 @@
 
 // Third party includes.
 #include <SimpleArchiver/src/helpers.h>
+#include <SimpleArchiver/src/data_structures/hash_map.h>
+#include <SimpleArchiver/src/data_structures/linked_list.h>
 
 // Local includes.
 #include "arg_parse.h"
 #include "big_endian.h"
 #include "config.h"
+#include "http_template.h"
 #include "tcp_socket.h"
 #include "signal_handling.h"
 #include "globals.h"
@@ -326,6 +332,139 @@ int c_simple_http_manage_connections(void *data, void *ud) {
   return 1;
 }
 
+int generate_paths_fn(const void *key,
+                      size_t key_size,
+                      const void *value,
+                      void *ud) {
+  const char *path = key;
+  const ConnectionContext *ctx = ud;
+  const char *generate_dir = ctx->args->generate_dir;
+
+  const unsigned long path_len = strlen(path);
+  const unsigned long generate_dir_len = strlen(generate_dir);
+
+  __attribute__((cleanup(simple_archiver_list_free)))
+  SDArchiverLinkedList *string_parts = simple_archiver_list_init();
+
+  // Add generate_dir as first path of paths to join.
+  c_simple_http_add_string_part(string_parts, generate_dir, 0);
+
+  // Ensure next character after generate_dir contains a '/' if generate_dir
+  // didn't contain one at the end.
+  if (generate_dir_len > 0 && generate_dir[generate_dir_len - 1] != '/') {
+    c_simple_http_add_string_part(string_parts, "/", 0);
+  }
+
+  // Append the path.
+  if (strcmp("path", "/") != 0) {
+    // Is not root.
+    uint32_t idx = 0;
+    while (idx <= path_len && path[idx] == '/') {
+      ++idx;
+    }
+    c_simple_http_add_string_part(string_parts, path + idx, 0);
+  }
+
+  // Add the final '/'.
+  if (path_len > 0 && path[path_len - 1] != '/') {
+    c_simple_http_add_string_part(string_parts, "/", 0);
+  }
+
+  // Add the ending "index.html".
+  c_simple_http_add_string_part(string_parts, "index.html", 0);
+
+  // Get the combined string.
+  __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
+  char *generated_path = c_simple_http_combine_string_parts(string_parts);
+  if (!generated_path) {
+    fprintf(stderr, "ERROR Failed to get generated path (path: %s)!\n", path);
+    return 1;
+  }
+
+  if ((ctx->args->flags & 4) == 0) {
+    // Overwrite not enabled, check if file already exists.
+    FILE *fd = fopen(generated_path, "rb");
+    if (fd) {
+      fclose(fd);
+      fprintf(
+        stderr,
+        "WARNING Path \"%s\" exists and \"--generate-enable-overwrite\" not "
+          "specified, skipping!\n",
+        generated_path);
+      return 0;
+    }
+  }
+
+  // Ensure the required dirs exist.
+  __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
+  char *generated_path_dup = strdup(generated_path);
+
+  uint_fast8_t did_make_generated_path_dir = 0;
+  char *generated_path_dir = dirname(generated_path_dup);
+  if (generated_path_dir) {
+    DIR *fd = opendir(generated_path_dir);
+    if (!fd) {
+      if (errno == ENOENT) {
+        c_simple_http_helper_mkdir_tree(generated_path_dir);
+        did_make_generated_path_dir = 1;
+      } else {
+        fprintf(stderr,
+                "ERROR opendir on path dirname failed unexpectedly (path: %s)!"
+                  "\n",
+                path);
+        return 1;
+      }
+    } else {
+      // Directory already exists.
+      closedir(fd);
+    }
+  } else {
+    fprintf(stderr,
+            "ERROR Failed to get dirname of generated path dir (path: %s)"
+              "!\n",
+            path);
+    return 1;
+  }
+
+  // Generate the html.
+  size_t html_buf_size = 0;
+  __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
+  char *html_buf = c_simple_http_path_to_generated(path,
+                                                   ctx->parsed,
+                                                   &html_buf_size,
+                                                   NULL);
+  if (!html_buf || html_buf_size == 0) {
+    fprintf(stderr,
+            "WARNING Failed to generate html for generate (path: %s), "
+              "skipping!\n",
+            path);
+    if (did_make_generated_path_dir) {
+      if (rmdir(generated_path_dir) == -1) {
+        fprintf(stderr,
+                "WARNING rmdir on generated_path_dir failed, errno: %d\n",
+                errno);
+      }
+    }
+    return 0;
+  }
+
+  // Save the html.
+  FILE *fd = fopen(generated_path, "wb");
+  unsigned long fwrite_ret = fwrite(html_buf, 1, html_buf_size, fd);
+  if (fwrite_ret < html_buf_size) {
+    fclose(fd);
+    unlink(generated_path);
+    fprintf(stderr,
+            "ERROR Unable to write entirely to \"%s\"!\n",
+            generated_path);
+    return 1;
+  } else {
+    fclose(fd);
+  }
+
+  return 0;
+}
+
 int main(int argc, char **argv) {
   __attribute__((cleanup(c_simple_http_free_args)))
   Args args = parse_args(argc, argv);
@@ -346,6 +485,22 @@ int main(int argc, char **argv) {
   );
   if (!parsed_config.hash_map) {
     return 5;
+  }
+
+  // If generate-dir is specified, the program must stop after generating or
+  // failure.
+  if (args.generate_dir) {
+    ConnectionContext ctx;
+    ctx.args = &args;
+    ctx.parsed = &parsed_config;
+    if (simple_archiver_hash_map_iter(parsed_config.paths,
+                                      generate_paths_fn,
+                                      &ctx)) {
+      fprintf(stderr, "ERROR during generating!\n");
+      return 1;
+    }
+    puts("Finished generating.");
+    return 0;
   }
 
   __attribute__((cleanup(cleanup_tcp_socket))) int tcp_socket =
