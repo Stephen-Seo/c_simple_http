@@ -126,7 +126,6 @@ void internal_double_quote_decrement(uint_fast8_t *double_quote_count,
 /// Returns non-zero if config should be returned.
 int internal_check_add_value(uint32_t *state,
                              char **key_buf,
-                             uint32_t *key_capacity,
                              uint32_t *key_idx,
                              char **value_buf,
                              uint32_t *value_capacity,
@@ -496,7 +495,6 @@ C_SIMPLE_HTTP_ParsedConfig c_simple_http_parse_config(
       } else {
         if (internal_check_add_value(&state,
                                      &key_buf,
-                                     &key_capacity,
                                      &key_idx,
                                      &value_buf,
                                      &value_capacity,
@@ -520,7 +518,6 @@ C_SIMPLE_HTTP_ParsedConfig c_simple_http_parse_config(
 
     if (internal_check_add_value(&state,
                                  &key_buf,
-                                 &key_capacity,
                                  &key_idx,
                                  &value_buf,
                                  &value_capacity,
