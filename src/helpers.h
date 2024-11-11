@@ -23,6 +23,7 @@
 
 // libc includes.
 #include <time.h>
+#include <dirent.h>
 
 // Local includes.
 #include "config.h"
@@ -76,6 +77,8 @@ char *c_simple_http_helper_unescape_uri(const char *uri);
 /// Returns 1 if the directory already exists.
 /// Other return values are errors.
 int c_simple_http_helper_mkdir_tree(const char *dirpath);
+
+void c_simple_http_cleanup_DIR(DIR **fd);
 
 #endif
 

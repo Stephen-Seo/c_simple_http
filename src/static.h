@@ -51,6 +51,11 @@ C_SIMPLE_HTTP_StaticFileInfo c_simple_http_get_file(
 /// Returns zero if OK.
 int c_simple_http_static_validate_path(const char *path);
 
+/// Copies all files in "from" into "to". Returns non-zero on failure.
+int c_simple_http_static_copy_over_dir(const char *from,
+                                       const char *to,
+                                       uint_fast8_t overwrite_enabled);
+
 #endif
 
 // vim: et ts=2 sts=2 sw=2

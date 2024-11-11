@@ -351,6 +351,7 @@ int main(int argc, char **argv) {
     ConnectionContext ctx;
     ctx.args = &args;
     ctx.parsed = &parsed_config;
+    printf("Generating html files to \"%s\"...\n", args.generate_dir);
     if (simple_archiver_hash_map_iter(parsed_config.paths,
                                       c_simple_http_generate_paths_fn,
                                       &ctx)) {
@@ -358,6 +359,17 @@ int main(int argc, char **argv) {
       return 1;
     }
     puts("Finished generating.");
+    if (args.static_dir) {
+      puts("Static dir option specified, copying over static dir entries...");
+      if (c_simple_http_static_copy_over_dir(args.static_dir,
+                                             args.generate_dir,
+                                             (args.flags & 4) != 0 ? 1 : 0)
+          != 0) {
+        fprintf(stderr, "ERROR during static-dir-entires copying!\n");
+        return 1;
+      }
+      puts("Finished copying over static-dir files.");
+    }
     return 0;
   }
 

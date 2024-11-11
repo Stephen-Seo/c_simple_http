@@ -31,9 +31,16 @@
 #include <unistd.h>
 #include <errno.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <dirent.h>
+#include <libgen.h>
 
 // Third party includes.
+#include "SimpleArchiver/src/data_structures/linked_list.h"
 #include "SimpleArchiver/src/helpers.h"
+
+// Local includes.
+#include "helpers.h"
 
 char **environ;
 
@@ -180,7 +187,9 @@ C_SIMPLE_HTTP_StaticFileInfo c_simple_http_get_file(
 
   if (fd == NULL) {
     fprintf(
-      stderr, "WARNING Failed to open path \"%s\" in static dir!\n", path + idx);
+      stderr,
+      "WARNING Failed to open path \"%s\" in static dir!\n",
+      path + idx);
     file_info.result = STATIC_FILE_RESULT_404NotFound;
     return file_info;
   }
@@ -328,6 +337,163 @@ int c_simple_http_static_validate_path(const char *path) {
       }
     }
   }
+  return 0;
+}
+
+int c_simple_http_static_copy_over_dir(const char *from,
+                                       const char *to,
+                                       uint_fast8_t overwrite_enabled) {
+  __attribute__((cleanup(c_simple_http_cleanup_DIR)))
+  DIR *from_fd = opendir(from);
+  if (!from_fd) {
+    fprintf(stderr, "ERROR Failed to open directory \"%s\"!\n", from);
+    return 1;
+  }
+
+  const unsigned long from_len = strlen(from);
+  const unsigned long to_len = strlen(to);
+
+  struct dirent *dir_entry = NULL;
+  do {
+    dir_entry = readdir(from_fd);
+    if (!dir_entry) {
+      break;
+    } else if (strcmp(dir_entry->d_name, ".") == 0
+        || strcmp(dir_entry->d_name, "..") == 0) {
+      continue;
+    } else if (dir_entry->d_type == DT_DIR) {
+      // Dir entry is a directory.
+      __attribute__((cleanup(simple_archiver_list_free)))
+      SDArchiverLinkedList *string_parts = simple_archiver_list_init();
+      c_simple_http_add_string_part(string_parts, from, 0);
+      if (from_len > 0 && from[from_len - 1] != '/') {
+        c_simple_http_add_string_part(string_parts, "/", 0);
+      }
+      c_simple_http_add_string_part(string_parts, dir_entry->d_name, 0);
+
+      __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
+      char *combined_from = c_simple_http_combine_string_parts(string_parts);
+
+      simple_archiver_list_free(&string_parts);
+      string_parts = simple_archiver_list_init();
+      c_simple_http_add_string_part(string_parts, to, 0);
+      if (to_len > 0 && to[to_len - 1] != '/') {
+        c_simple_http_add_string_part(string_parts, "/", 0);
+      }
+      c_simple_http_add_string_part(string_parts, dir_entry->d_name, 0);
+
+      __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
+      char *combined_to = c_simple_http_combine_string_parts(string_parts);
+
+      int ret = c_simple_http_static_copy_over_dir(combined_from,
+                                                   combined_to,
+                                                   overwrite_enabled);
+      if (ret != 0) {
+        return ret;
+      }
+    } else if (dir_entry->d_type == DT_REG) {
+      // Dir entry is a file.
+      __attribute__((cleanup(simple_archiver_list_free)))
+      SDArchiverLinkedList *string_parts = simple_archiver_list_init();
+      c_simple_http_add_string_part(string_parts, from, 0);
+      if (from_len > 0 && from[from_len - 1] != '/') {
+        c_simple_http_add_string_part(string_parts, "/", 0);
+      }
+      c_simple_http_add_string_part(string_parts, dir_entry->d_name, 0);
+
+      __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
+      char *combined_from = c_simple_http_combine_string_parts(string_parts);
+
+      simple_archiver_list_free(&string_parts);
+      string_parts = simple_archiver_list_init();
+      c_simple_http_add_string_part(string_parts, to, 0);
+      if (to_len > 0 && to[to_len - 1] != '/') {
+        c_simple_http_add_string_part(string_parts, "/", 0);
+      }
+      c_simple_http_add_string_part(string_parts, dir_entry->d_name, 0);
+
+      __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
+      char *combined_to = c_simple_http_combine_string_parts(string_parts);
+
+      if (!overwrite_enabled) {
+        __attribute__((cleanup(simple_archiver_helper_cleanup_FILE)))
+        FILE *fd = fopen(combined_to, "rb");
+        if (fd) {
+          fprintf(
+            stderr,
+            "WARNING \"%s\" already exists and --generate-enable-overwrite not "
+              "specified, skipping!\n",
+            combined_to);
+          continue;
+        }
+      }
+
+      __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
+      char *combined_to_dup = strdup(combined_to);
+      char *combined_to_dirname = dirname(combined_to_dup);
+
+      int ret = c_simple_http_helper_mkdir_tree(combined_to_dirname);
+      if (ret != 0 && ret != 1) {
+        fprintf(stderr,
+                "ERROR Failed to create directory \"%s\"!\n",
+                combined_to_dirname);
+        return 1;
+      }
+
+      __attribute__((cleanup(simple_archiver_helper_cleanup_FILE)))
+      FILE *from_file_fd = fopen(combined_from, "rb");
+      if (!from_file_fd) {
+        fprintf(stderr,
+                "ERROR Failed to open file \"%s\" for reading!\n",
+                combined_from);
+        return 1;
+      }
+
+      __attribute__((cleanup(simple_archiver_helper_cleanup_FILE)))
+      FILE *to_file_fd = fopen(combined_to, "wb");
+      if (!to_file_fd) {
+        fprintf(stderr,
+                "ERROR Failed to open file \"%s\" for writing!\n",
+                combined_to);
+        return 1;
+      }
+
+      char *buf[1024];
+      size_t fread_ret;
+      unsigned long fwrite_ret;
+      while (!feof(from_file_fd)
+          && !ferror(from_file_fd)
+          && !ferror(to_file_fd)) {
+        fread_ret = fread(buf, 1, 1024, from_file_fd);
+        if (fread_ret > 0) {
+          fwrite_ret = fwrite(buf, 1, fread_ret, to_file_fd);
+          if (fwrite_ret < fread_ret) {
+            fprintf(
+              stderr,
+              "ERROR Writing to file \"%s\" (not all bytes written)!\n",
+              combined_to);
+            return 1;
+          }
+        }
+      }
+
+      if (ferror(from_file_fd)) {
+        fprintf(stderr, "ERROR Reading from file \"%s\"!\n", combined_from);
+        return 1;
+      } else if (ferror(to_file_fd)) {
+        fprintf(stderr, "ERROR Writing to file \"%s\"!\n", combined_to);
+        return 1;
+      }
+
+      printf("%s -> %s\n", combined_from, combined_to);
+    } else {
+      fprintf(stderr,
+              "WARNING Non-dir and non-file \"%s/%s\", skipping...\n",
+              from,
+              dir_entry->d_name);
+    }
+  } while (dir_entry != NULL);
+
   return 0;
 }
 

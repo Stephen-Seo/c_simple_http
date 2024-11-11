@@ -24,7 +24,6 @@
 // libc includes.
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <dirent.h>
 #include <errno.h>
 #include <libgen.h>
 
@@ -255,6 +254,13 @@ int c_simple_http_helper_mkdir_tree(const char *path) {
   } else {
     // Other directory error.
     return 2;
+  }
+}
+
+void c_simple_http_cleanup_DIR(DIR **fd) {
+  if (fd && *fd) {
+    closedir(*fd);
+    *fd = NULL;
   }
 }
 
