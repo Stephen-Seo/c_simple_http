@@ -4,6 +4,8 @@
 
 Fix internal erronous buffer declaration.
 
+Fix internal missing NULL check.
+
 ## Version 1.2
 
 Add the `--generate-dir=<DIR>` option, which will generate all html into the
