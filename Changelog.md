@@ -2,6 +2,8 @@
 
 ## Upcoming Changes
 
+Fix internal erronous buffer declaration.
+
 ## Version 1.2
 
 Add the `--generate-dir=<DIR>` option, which will generate all html into the
