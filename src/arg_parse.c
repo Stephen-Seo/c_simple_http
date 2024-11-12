@@ -184,7 +184,9 @@ Args parse_args(int32_t argc, char **argv) {
       } else {
         printf("Directory \"%s\" exists.\n", args.generate_dir);
       }
-      closedir(d);
+      if (d) {
+        closedir(d);
+      }
     } else if (strcmp(argv[0], "--generate-enable-overwrite") == 0) {
       args.flags |= 4;
     } else {
