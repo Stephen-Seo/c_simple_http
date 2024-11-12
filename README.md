@@ -15,6 +15,8 @@ A simple HTTP/1.1 server written in C.
       --enable-cache-dir=<DIR>
       --cache-entry-lifetime-seconds=<SECONDS>
       --enable-static-dir=<DIR>
+      --generate-dir=<DIR>
+      --generate-enable-overwrite
 
 ## Changelog
 
