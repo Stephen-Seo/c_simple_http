@@ -458,7 +458,7 @@ int c_simple_http_static_copy_over_dir(const char *from,
         return 1;
       }
 
-      char *buf[1024];
+      char buf[1024];
       size_t fread_ret;
       unsigned long fwrite_ret;
       while (!feof(from_file_fd)
