@@ -2,6 +2,17 @@
 
 ## Upcoming Changes
 
+## Version 1.2
+
+Add the `--generate-dir=<DIR>` option, which will generate all html into the
+given directory. This requires `--config=<CONFIG_FILE>`.
+`--generate-enable-overwrite` is required to overwrite existing files when using
+`--generate-dir=<DIR>`.
+
+If `--enable-static-dir=<DIR>` is also specified with generate, then the files
+in the given directory will be copied into the directory specified with
+`--generate-dir=<DIR>`.
+
 ## Version 1.1
 
 Some refactoring of code handling parsing the config file.
