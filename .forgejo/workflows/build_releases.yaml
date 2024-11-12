@@ -172,6 +172,8 @@ jobs:
             cmake -S . -B buildRelease -DCMAKE_BUILD_TYPE=Release
             make -C buildRelease c_simple_http
 
+            strip --strip-unneeded buildRelease/c_simple_http
+
             popd >&/dev/null
             zstd --ultra -20 c_simple_http_clone/buildRelease/c_simple_http -o "${BUILD_ASSET_NAME}"
 
@@ -232,6 +234,8 @@ jobs:
 
             cmake -S . -B buildRelease -DCMAKE_BUILD_TYPE=Release
             make -C buildRelease c_simple_http
+
+            strip --strip-unneeded buildRelease/c_simple_http
 
             popd >&/dev/null
             zstd --ultra -20 c_simple_http_clone/buildRelease/c_simple_http -o "${BUILD_ASSET_NAME}"
