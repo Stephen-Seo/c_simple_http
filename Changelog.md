@@ -2,6 +2,8 @@
 
 ## Upcoming Changes
 
+## Version 1.3
+
 Fix internal erronous buffer declaration.
 
 Fix internal missing NULL check.
