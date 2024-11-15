@@ -36,6 +36,23 @@ typedef struct C_SIMPLE_HTTP_INTERNAL_RequiredCheck {
   const SDArchiverLinkedList *required;
 } C_SIMPLE_HTTP_INTERNAL_RequiredCheck;
 
+void c_simple_http_cleanup_config_value(
+    C_SIMPLE_HTTP_ConfigValue *config_value) {
+  if (config_value) {
+    if (config_value->next) {
+      c_simple_http_cleanup_config_value(config_value->next);
+    }
+    if(config_value->value) {
+      free(config_value->value);
+    }
+    free(config_value);
+  }
+}
+
+void c_simple_http_cleanup_config_value_void_ptr(void *config_value) {
+  c_simple_http_cleanup_config_value(config_value);
+}
+
 int c_simple_http_required_iter_fn(void *data, void *ud) {
   C_SIMPLE_HTTP_INTERNAL_RequiredIter *req_iter_struct = ud;
   uint32_t data_str_length = (uint32_t)strlen(data) + 1;
@@ -187,21 +204,26 @@ int internal_check_add_value(uint32_t *state,
     SDArchiverHashMap *hash_map = simple_archiver_hash_map_init();
     unsigned char *key = malloc(separating_key_size);
     strncpy((char*)key, separating_key, separating_key_size);
-    unsigned char *value = malloc(*value_idx);
-    memcpy(value, *value_buf, (*value_idx));
-    if (simple_archiver_hash_map_insert(hash_map,
-                                        value,
-                                        key,
-                                        separating_key_size,
-                                        NULL,
-                                        NULL) != 0) {
+    C_SIMPLE_HTTP_ConfigValue *config_value =
+      malloc(sizeof(C_SIMPLE_HTTP_ConfigValue));
+    config_value->value = malloc(*value_idx);
+    config_value->next = NULL;
+    memcpy(config_value->value, *value_buf, (*value_idx));
+    if (simple_archiver_hash_map_insert(
+        hash_map,
+        config_value,
+        key,
+        separating_key_size,
+        c_simple_http_cleanup_config_value_void_ptr,
+        NULL) != 0) {
       fprintf(stderr,
         "ERROR: Failed to create hash map for new separating_key "
         "block!\n");
       c_simple_http_clean_up_parsed_config(config);
       config->hash_map = NULL;
       free(key);
-      free(value);
+      free(config_value->value);
+      free(config_value);
       return 1;
     }
 
@@ -212,7 +234,7 @@ int internal_check_add_value(uint32_t *state,
     if (simple_archiver_hash_map_insert(
         config->hash_map,
         wrapper,
-        value,
+        config_value->value,
         (*value_idx),
         c_simple_http_hash_map_wrapper_cleanup_hashmap_fn,
         simple_archiver_helper_datastructure_cleanup_nop) != 0) {
@@ -223,7 +245,7 @@ int internal_check_add_value(uint32_t *state,
       c_simple_http_hash_map_wrapper_cleanup(wrapper);
       return 1;
     }
-    simple_archiver_list_add(paths, value,
+    simple_archiver_list_add(paths, config_value->value,
         simple_archiver_helper_datastructure_cleanup_nop);
   } else if (!(*current_separating_key_value)) {
     fprintf(
@@ -254,20 +276,36 @@ int internal_check_add_value(uint32_t *state,
     unsigned char *value = malloc(*value_idx);
     memcpy(value, *value_buf, (*value_idx));
 
-    if (simple_archiver_hash_map_insert(hash_map_wrapper->paths,
-                                        value,
-                                        key,
-                                        *key_idx,
-                                        NULL,
-                                        NULL) != 0) {
-      fprintf(stderr,
-        "ERROR: Internal error failed to insert into hash map with path "
-        "\"%s\"!", (*current_separating_key_value));
-      c_simple_http_clean_up_parsed_config(config);
-      config->hash_map = NULL;
-      free(key);
-      free(value);
-      return 1;
+    // Check if key already exists in wrapped hash-map.
+    C_SIMPLE_HTTP_ConfigValue *config_value =
+      simple_archiver_hash_map_get(hash_map_wrapper->paths, key, *key_idx);
+    if (config_value) {
+      while(config_value->next) {
+        config_value = config_value->next;
+      }
+      config_value->next = malloc(sizeof(C_SIMPLE_HTTP_ConfigValue));
+      config_value->next->value = (char*)value;
+      config_value->next->next = NULL;
+    } else {
+      config_value = malloc(sizeof(C_SIMPLE_HTTP_ConfigValue));
+      config_value->value = (char*)value;
+      config_value->next = NULL;
+      if (simple_archiver_hash_map_insert(
+          hash_map_wrapper->paths,
+          config_value,
+          key,
+          *key_idx,
+          c_simple_http_cleanup_config_value_void_ptr,
+          NULL) != 0) {
+        fprintf(stderr,
+          "ERROR: Internal error failed to insert into hash map with path "
+          "\"%s\"!", (*current_separating_key_value));
+        c_simple_http_clean_up_parsed_config(config);
+        config->hash_map = NULL;
+        free(key);
+        free(value);
+        return 1;
+      }
     }
   }
   (*key_idx) = 0;

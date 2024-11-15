@@ -30,6 +30,9 @@ typedef struct C_SIMPLE_HTTP_ParsedConfig {
   /// KEY: "/", VALUE: HashMapWrapper struct
   /// KEY: "/inner", VALUE: HashMapWrapper struct
   /// KEY: "/inner/further", VALUE: HashMapWrapper struct
+  ///
+  /// Each HashMapWrapper struct's hash-map has the following:
+  /// KEY: VAR_NAME, VALUE: ConfigValue struct
   union {
     SDArchiverHashMap *paths;
     SDArchiverHashMap *hash_map;
@@ -37,6 +40,15 @@ typedef struct C_SIMPLE_HTTP_ParsedConfig {
 } C_SIMPLE_HTTP_ParsedConfig;
 
 typedef C_SIMPLE_HTTP_ParsedConfig C_SIMPLE_HTTP_HashMapWrapper;
+
+typedef struct C_SIMPLE_HTTP_ConfigValue {
+  char *value;
+  struct C_SIMPLE_HTTP_ConfigValue *next;
+} C_SIMPLE_HTTP_ConfigValue;
+
+void c_simple_http_cleanup_config_value(
+  C_SIMPLE_HTTP_ConfigValue *config_value);
+void c_simple_http_cleanup_config_value_void_ptr(void *config_value);
 
 /// Each line in the config should be a key-value pair separated by an equals
 /// sign "=". All whitespace is ignored unless if the value is "quoted". A part

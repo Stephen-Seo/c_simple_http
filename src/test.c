@@ -173,46 +173,53 @@ int main(int argc, char **argv) {
       simple_archiver_hash_map_get(templates.paths, "/", 2);
     ASSERT_TRUE(first_path_map_wrapper);
 
-    const char *value =
+    C_SIMPLE_HTTP_ConfigValue *value =
       simple_archiver_hash_map_get(first_path_map_wrapper->paths, "PATH", 5);
     ASSERT_TRUE(value);
-    ASSERT_STREQ(value, "/");
+    ASSERT_TRUE(value->value);
+    ASSERT_STREQ(value->value, "/");
 
     value =
       simple_archiver_hash_map_get(first_path_map_wrapper->paths, "HTML", 5);
     ASSERT_TRUE(value);
+    ASSERT_TRUE(value->value);
     // printf("%s\n", value);
-    ASSERT_STREQ(value, " one two three ");
+    ASSERT_STREQ(value->value, " one two three ");
 
     value =
       simple_archiver_hash_map_get(first_path_map_wrapper->paths, "TEST", 5);
     ASSERT_TRUE(value);
+    ASSERT_TRUE(value->value);
     // printf("%s\n", value);
-    ASSERT_STREQ(value, " \"one two \"three ");
+    ASSERT_STREQ(value->value, " \"one two \"three ");
 
     value =
       simple_archiver_hash_map_get(first_path_map_wrapper->paths, "TEST2", 6);
     ASSERT_TRUE(value);
+    ASSERT_TRUE(value->value);
     // printf("%s\n", value);
-    ASSERT_STREQ(value, "'\"onetwo\"three''");
+    ASSERT_STREQ(value->value, "'\"onetwo\"three''");
 
     value =
       simple_archiver_hash_map_get(first_path_map_wrapper->paths, "TEST3", 6);
     ASSERT_TRUE(value);
+    ASSERT_TRUE(value->value);
     // printf("%s\n", value);
-    ASSERT_STREQ(value, " \"one two \"three ''");
+    ASSERT_STREQ(value->value, " \"one two \"three ''");
 
     value =
       simple_archiver_hash_map_get(first_path_map_wrapper->paths, "TEST4", 6);
     ASSERT_TRUE(value);
+    ASSERT_TRUE(value->value);
     // printf("%s\n", value);
-    ASSERT_STREQ(value, " \"\"\"one two \"\"\"three ");
+    ASSERT_STREQ(value->value, " \"\"\"one two \"\"\"three ");
 
     value =
       simple_archiver_hash_map_get(first_path_map_wrapper->paths, "TEST5", 6);
     ASSERT_TRUE(value);
+    ASSERT_TRUE(value->value);
     // printf("%s\n", value);
-    ASSERT_STREQ(value, " '''one two '''three ");
+    ASSERT_STREQ(value->value, " '''one two '''three ");
 
     simple_archiver_list_free(&required_names);
     required_names = simple_archiver_list_init();
