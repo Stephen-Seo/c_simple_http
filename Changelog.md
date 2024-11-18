@@ -2,6 +2,14 @@
 
 ## Upcoming Changes
 
+Implemented "IF", "ELSEIF", "ELSE", "ENDIF", and "INDEX" for templates.
+
+IF is used like: `{{{!IF Variable==SomeString}}}`.
+ELSEIF is used like: `{{{!ELSEIF Variable==AnotherString}}}`.
+ELSE is used like: `{{{!ELSE}}}`.
+ENDIF is used like: `{{{!ENDIF}}}`.
+INDEX is used like: `{{{!INDEX ArrayVar[2]}}}`.
+
 ## Version 1.3
 
 Fix internal erronous buffer declaration.
