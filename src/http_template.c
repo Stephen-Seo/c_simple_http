@@ -49,6 +49,88 @@ int c_simple_http_internal_ends_with_FILE(const char *c_string) {
   return 2;
 }
 
+/// Returns zero on success.
+int c_simple_http_internal_handle_inside_delimeters(
+    const size_t idx,
+    const char *var,
+    const size_t var_size,
+    const C_SIMPLE_HTTP_ParsedConfig *wrapped_hash_map,
+    SDArchiverLinkedList *string_part_list,
+    SDArchiverLinkedList **files_list_out) {
+  C_SIMPLE_HTTP_String_Part string_part;
+  C_SIMPLE_HTTP_ConfigValue *config_value =
+    simple_archiver_hash_map_get(
+      wrapped_hash_map->hash_map,
+      var,
+      (uint32_t)var_size + 1);
+  if (config_value && config_value->value) {
+    if (c_simple_http_internal_ends_with_FILE(var) == 0) {
+      // Load from file specified by "config_value->value".
+      __attribute__((cleanup(simple_archiver_helper_cleanup_FILE)))
+      FILE *f = fopen(config_value->value, "r");
+      if (!f) {
+        fprintf(stderr, "ERROR Failed to open file \"%s\"!\n",
+                config_value->value);
+        return 1;
+      } else if (fseek(f, 0, SEEK_END) != 0) {
+        fprintf(stderr, "ERROR Failed to seek to end of file \"%s\"!\n",
+                config_value->value);
+        return 1;
+      }
+      long file_size = ftell(f);
+      if (file_size <= 0) {
+        fprintf(stderr, "ERROR Size of file \"%s\" is invalid!\n",
+                config_value->value);
+        return 1;
+      } else if (fseek(f, 0, SEEK_SET) != 0) {
+        fprintf(stderr, "ERROR Failed to seek to start of file "
+                "\"%s\"!\n",
+                config_value->value);
+        return 1;
+      }
+      string_part.size = (size_t)file_size + 1;
+      string_part.buf = malloc(string_part.size);
+      string_part.extra = idx + 1;
+
+      if (fread(string_part.buf,
+                string_part.size - 1,
+                1,
+                f)
+            != 1) {
+        fprintf(stderr, "ERROR Failed to read from file \"%s\"!\n",
+                config_value->value);
+        return 1;
+      }
+      string_part.buf[string_part.size - 1] = 0;
+      if (files_list_out) {
+        char *variable_filename = malloc(strlen(config_value->value) + 1);
+        strcpy(variable_filename, config_value->value);
+        simple_archiver_list_add(
+            *files_list_out, variable_filename, NULL);
+      }
+    } else {
+      // Variable data is "config_value->value".
+      string_part.size = strlen(config_value->value) + 1;
+      string_part.buf = malloc(string_part.size);
+      memcpy(string_part.buf, config_value->value, string_part.size);
+      string_part.buf[string_part.size - 1] = 0;
+      string_part.extra = idx + 1;
+    }
+  } else {
+    string_part.buf = NULL;
+    string_part.size = 0;
+    string_part.extra = idx + 1;
+  }
+  c_simple_http_add_string_part(string_part_list,
+                                string_part.buf,
+                                string_part.extra);
+  if (string_part.buf) {
+    free(string_part.buf);
+  }
+
+  return 0;
+}
+
 char *c_simple_http_path_to_generated(
     const char *path,
     const C_SIMPLE_HTTP_HTTPTemplates *templates,
@@ -66,7 +148,7 @@ char *c_simple_http_path_to_generated(
     return NULL;
   }
   uint32_t path_len = (uint32_t)path_len_size_t;
-  C_SIMPLE_HTTP_ParsedConfig *wrapped_hash_map =
+  const C_SIMPLE_HTTP_ParsedConfig *wrapped_hash_map =
     simple_archiver_hash_map_get(templates->hash_map, path, path_len);
   if (!wrapped_hash_map) {
     return NULL;
@@ -170,7 +252,7 @@ char *c_simple_http_path_to_generated(
           state &= 0xFFFFFFFE;
           C_SIMPLE_HTTP_String_Part *last_part =
             string_part_list->tail->prev->data;
-          size_t var_size = idx - 2 - last_part->extra;
+          const size_t var_size = idx - 2 - last_part->extra;
           __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
           char *var = malloc(var_size + 1);
           memcpy(
@@ -178,73 +260,15 @@ char *c_simple_http_path_to_generated(
             html_buf + last_part->extra,
             var_size);
           var[var_size] = 0;
-          C_SIMPLE_HTTP_ConfigValue *config_value =
-            simple_archiver_hash_map_get(
-              wrapped_hash_map->hash_map,
-              var,
-              (uint32_t)var_size + 1);
-          if (config_value && config_value->value) {
-            if (c_simple_http_internal_ends_with_FILE(var) == 0) {
-              // Load from file specified by "config_value->value".
-              __attribute__((cleanup(simple_archiver_helper_cleanup_FILE)))
-              FILE *f = fopen(config_value->value, "r");
-              if (!f) {
-                fprintf(stderr, "ERROR Failed to open file \"%s\"!\n",
-                        config_value->value);
-                return NULL;
-              } else if (fseek(f, 0, SEEK_END) != 0) {
-                fprintf(stderr, "ERROR Failed to seek to end of file \"%s\"!\n",
-                        config_value->value);
-                return NULL;
-              }
-              long file_size = ftell(f);
-              if (file_size <= 0) {
-                fprintf(stderr, "ERROR Size of file \"%s\" is invalid!\n",
-                        config_value->value);
-                return NULL;
-              } else if (fseek(f, 0, SEEK_SET) != 0) {
-                fprintf(stderr, "ERROR Failed to seek to start of file "
-                        "\"%s\"!\n",
-                        config_value->value);
-                return NULL;
-              }
-              string_part.size = (size_t)file_size + 1;
-              string_part.buf = malloc(string_part.size);
-              string_part.extra = idx + 1;
-
-              if (fread(string_part.buf,
-                        string_part.size - 1,
-                        1,
-                        f)
-                    != 1) {
-                fprintf(stderr, "ERROR Failed to read from file \"%s\"!\n",
-                        config_value->value);
-                return NULL;
-              }
-              string_part.buf[string_part.size - 1] = 0;
-              if (files_list_out) {
-                char *variable_filename = malloc(strlen(config_value->value) + 1);
-                strcpy(variable_filename, config_value->value);
-                simple_archiver_list_add(
-                    *files_list_out, variable_filename, NULL);
-              }
-            } else {
-              // Variable data is "config_value->value".
-              string_part.size = strlen(config_value->value) + 1;
-              string_part.buf = malloc(string_part.size);
-              memcpy(string_part.buf, config_value->value, string_part.size);
-              string_part.buf[string_part.size - 1] = 0;
-              string_part.extra = idx + 1;
-            }
-          } else {
-            string_part.buf = NULL;
-            string_part.size = 0;
-            string_part.extra = idx + 1;
+          if (c_simple_http_internal_handle_inside_delimeters(
+                idx,
+                var,
+                var_size,
+                wrapped_hash_map,
+                string_part_list,
+                files_list_out) != 0) {
+            return NULL;
           }
-          c_simple_http_add_string_part(string_part_list,
-                                        string_part.buf,
-                                        string_part.extra);
-          free(string_part.buf);
         }
       } else {
         delimeter_count = 0;
