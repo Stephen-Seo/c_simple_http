@@ -56,6 +56,16 @@ void c_simple_http_cleanup_string_part(void *data);
 void c_simple_http_add_string_part(
   SDArchiverLinkedList *list, const char *c_string, uintptr_t extra);
 
+/// Puts a malloced instance of String_Part into the list.
+/// The given c_string will be copied into a newly malloced buffer.
+/// "size" must include NULL if "buffer" is a c_string.
+/// If there is no NULL at the end, "size" must be +1 actual size.
+void c_simple_http_add_string_part_sized(
+  SDArchiverLinkedList *list,
+  const char *buffer,
+  size_t size,
+  uintptr_t extra);
+
 /// Combines all String_Parts in the list and returns it as a single buffer.
 char *c_simple_http_combine_string_parts(const SDArchiverLinkedList *list);
 
@@ -79,6 +89,13 @@ char *c_simple_http_helper_unescape_uri(const char *uri);
 int c_simple_http_helper_mkdir_tree(const char *dirpath);
 
 void c_simple_http_cleanup_DIR(DIR **fd);
+
+/// Must be free'd if non-NULL.
+char *c_simple_http_FILE_to_c_str(const char *filename, uint64_t *size_out);
+
+/// Trims by placing NULL bytes in place of whitespace at the end of c_str.
+/// Returns number of whitespace trimmed.
+size_t c_simple_http_trim_end_whitespace(char *c_str);
 
 #endif
 

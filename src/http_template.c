@@ -49,83 +49,479 @@ int c_simple_http_internal_ends_with_FILE(const char *c_string) {
   return 2;
 }
 
+int c_simple_http_internal_parse_if_expression(
+    const C_SIMPLE_HTTP_ParsedConfig *wrapped_hash_map,
+    const char *var,
+    const size_t var_offset,
+    const size_t var_size,
+    char **left_side_out,
+    char **right_side_out,
+    uint_fast8_t *is_equality_out,
+    SDArchiverLinkedList **files_list_out) {
+  if (!left_side_out || !right_side_out || !is_equality_out) {
+    fprintf(stderr, "ERROR Internal error! %s\n", var);
+    return 1;
+  }
+  *left_side_out = NULL;
+  *right_side_out = NULL;
+
+  __attribute__((cleanup(simple_archiver_list_free)))
+  SDArchiverLinkedList *var_parts = simple_archiver_list_init();
+  char buf[64];
+  size_t buf_idx = 0;
+  size_t idx = var_offset;
+  ssize_t var_index = -1;
+  for(; idx < var_size; ++idx) {
+    if (idx + 1 < var_size && var[idx] == '!' && var[idx + 1] == '=') {
+      break;
+    } else if (idx + 1 < var_size && var[idx] == '=' && var[idx + 1] == '=') {
+      break;
+    } else if (var[idx] == '[') {
+      if (var_index >= 0) {
+        fprintf(stderr, "ERROR \"[\" Encountered twice! %s\n", var);
+        return 1;
+      }
+      idx += 1;
+      var_index = 0;
+      for(; idx < var_size; ++idx) {
+        if (var[idx] == ']') {
+          break;
+        } else if (var[idx] >= '0' && var[idx] <= '9') {
+          var_index = var_index * 10 + ((ssize_t)(var[idx] - '0'));
+        } else {
+          fprintf(stderr, "ERROR Syntax error in \"[...]\"! %s\n", var);
+          return 1;
+        }
+      }
+      if (idx >= var_size) {
+        fprintf(
+          stderr, "ERROR End of expression during parsing! %s\n", var);
+        return 1;
+      } else if (var[idx] != ']') {
+        fprintf(stderr, "ERROR No closing \"]\"! %s\n", var);
+        return 1;
+      } else if (
+          idx + 1 < var_size && var[idx] == '!' && var[idx + 1] == '=') {
+        break;
+      } else if (
+          idx + 1 < var_size && var[idx] == '=' && var[idx + 1] == '=') {
+        break;
+      } else {
+        fprintf(stderr, "ERROR Invalid expression after \"]\"! %s\n", var);
+        return 1;
+      }
+    }
+    buf[buf_idx++] = var[idx];
+    if (buf_idx >= 63) {
+      buf[63] = 0;
+      c_simple_http_add_string_part(var_parts, buf, 0);
+      buf_idx = 0;
+    }
+  }
+
+  if (buf_idx == 0) {
+    fprintf(stderr, "ERROR Empty VAR in expression! %s\n", var);
+    return 1;
+  } else if (idx >= var_size) {
+    fprintf(stderr, "ERROR Invalid \"IF\" expression! %s\n", var);
+    return 1;
+  }
+
+  __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
+  char *var_buf = NULL;
+  if (var_parts->count != 0) {
+    if (buf_idx != 0) {
+      buf[buf_idx] = 0;
+      c_simple_http_add_string_part(var_parts, buf, 0);
+    }
+    var_buf = c_simple_http_combine_string_parts(var_parts);
+  } else {
+    buf[buf_idx] = 0;
+    var_buf = strdup(buf);
+  }
+  buf_idx = 0;
+  simple_archiver_list_free(&var_parts);
+  var_parts = simple_archiver_list_init();
+
+  C_SIMPLE_HTTP_ConfigValue *config_value =
+    simple_archiver_hash_map_get(wrapped_hash_map->hash_map,
+                                 var_buf,
+                                 strlen(var_buf) + 1);
+  if (!config_value || !config_value->value) {
+    fprintf(stderr, "ERROR Invalid VAR after \"IF/ELSEIF\"! %s\n", var);
+    return 1;
+  } else if (var_index >= 0) {
+    for (size_t var_index_idx = 0;
+         var_index_idx < var_index;
+         ++var_index_idx) {
+      config_value = config_value->next;
+      if (!config_value) {
+        fprintf(stderr, "ERROR Array index out of bounds! %s\n", var);
+        return 1;
+      }
+    }
+  }
+
+  uint64_t left_side_size = 0;
+  if (c_simple_http_internal_ends_with_FILE(var_buf) == 0) {
+    *left_side_out =
+      c_simple_http_FILE_to_c_str(config_value->value, &left_side_size);
+    if (!*left_side_out || left_side_size == 0) {
+      fprintf(stderr, "ERROR _FILE variable could not be read! %s\n", var);
+      if (*left_side_out) {
+        free(*left_side_out);
+        *left_side_out = NULL;
+      }
+      return 1;
+    }
+    c_simple_http_trim_end_whitespace(*left_side_out);
+    left_side_size = strlen(*left_side_out);
+    if (files_list_out) {
+      simple_archiver_list_add(*files_list_out,
+                               strdup(config_value->value),
+                               NULL);
+    }
+  } else {
+    *left_side_out = strdup(config_value->value);
+    c_simple_http_trim_end_whitespace(*left_side_out);
+    left_side_size = strlen(*left_side_out);
+  }
+
+  if (idx + 1 < var_size && var[idx] == '=' && var[idx + 1] == '=') {
+    *is_equality_out = 1;
+  } else if (idx + 1 < var_size && var[idx] == '!' && var[idx] == '=') {
+    *is_equality_out = 0;
+  } else {
+    fprintf(stderr, "ERROR Operation not n/eq! %s\n", var);
+    return 1;
+  }
+
+  idx += 2;
+
+  for (; idx < var_size; ++idx) {
+    buf[buf_idx++] = var[idx];
+    if (buf_idx >= 63) {
+      buf[63] = 0;
+      c_simple_http_add_string_part(var_parts, buf, 0);
+      buf_idx = 0;
+    }
+  }
+
+  if (var_parts->count != 0) {
+    if (buf_idx != 0) {
+      buf[buf_idx] = 0;
+      c_simple_http_add_string_part(var_parts, buf, 0);
+    }
+    *right_side_out = c_simple_http_combine_string_parts(var_parts);
+  } else {
+    buf[buf_idx] = 0;
+    *right_side_out = strdup(buf);
+  }
+  c_simple_http_trim_end_whitespace(*right_side_out);
+  uint64_t right_side_size = strlen(*right_side_out);
+  if (right_side_size == 0) {
+    fprintf(stderr, "ERROR Right side is empty! %s\n", var);
+    return 1;
+  }
+  simple_archiver_list_free(&var_parts);
+  var_parts = simple_archiver_list_init();
+  buf_idx = 0;
+  return 0;
+}
+
 /// Returns zero on success.
 int c_simple_http_internal_handle_inside_delimeters(
-    const size_t idx,
+    uint32_t *state,
+    const size_t html_buf_idx,
     const char *var,
     const size_t var_size,
     const C_SIMPLE_HTTP_ParsedConfig *wrapped_hash_map,
     SDArchiverLinkedList *string_part_list,
     SDArchiverLinkedList **files_list_out) {
   C_SIMPLE_HTTP_String_Part string_part;
-  C_SIMPLE_HTTP_ConfigValue *config_value =
-    simple_archiver_hash_map_get(
-      wrapped_hash_map->hash_map,
-      var,
-      (uint32_t)var_size + 1);
-  if (config_value && config_value->value) {
-    if (c_simple_http_internal_ends_with_FILE(var) == 0) {
-      // Load from file specified by "config_value->value".
-      __attribute__((cleanup(simple_archiver_helper_cleanup_FILE)))
-      FILE *f = fopen(config_value->value, "r");
-      if (!f) {
-        fprintf(stderr, "ERROR Failed to open file \"%s\"!\n",
-                config_value->value);
-        return 1;
-      } else if (fseek(f, 0, SEEK_END) != 0) {
-        fprintf(stderr, "ERROR Failed to seek to end of file \"%s\"!\n",
-                config_value->value);
+  if (var_size == 0) {
+    fprintf(stderr, "ERROR No characters within delimeters!\n");
+    return 1;
+  } else if (var[0] == '!') {
+    // Is an expression.
+    if (strncmp(var + 1, "IF ", 3) == 0) {
+      if (((*state) & 0xE) != 0) {
+        fprintf(stderr, "ERROR Invalid \"IF\" (bad state)! %s\n", var);
         return 1;
       }
-      long file_size = ftell(f);
-      if (file_size <= 0) {
-        fprintf(stderr, "ERROR Size of file \"%s\" is invalid!\n",
-                config_value->value);
-        return 1;
-      } else if (fseek(f, 0, SEEK_SET) != 0) {
-        fprintf(stderr, "ERROR Failed to seek to start of file "
-                "\"%s\"!\n",
-                config_value->value);
-        return 1;
-      }
-      string_part.size = (size_t)file_size + 1;
-      string_part.buf = malloc(string_part.size);
-      string_part.extra = idx + 1;
 
-      if (fread(string_part.buf,
-                string_part.size - 1,
-                1,
-                f)
-            != 1) {
-        fprintf(stderr, "ERROR Failed to read from file \"%s\"!\n",
-                config_value->value);
+      __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
+      char *left_side = NULL;
+      __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
+      char *right_side = NULL;
+
+      uint_fast8_t is_equality = 0;
+
+      if (c_simple_http_internal_parse_if_expression(
+          wrapped_hash_map,
+          var,
+          1 + 3,
+          var_size,
+          &left_side,
+          &right_side,
+          &is_equality,
+          files_list_out)) {
+        return 1;
+      } else if (!left_side || !right_side) {
+        fprintf(stderr, "ERROR Internal error! %s\n", var);
         return 1;
       }
-      string_part.buf[string_part.size - 1] = 0;
-      if (files_list_out) {
-        char *variable_filename = malloc(strlen(config_value->value) + 1);
-        strcpy(variable_filename, config_value->value);
-        simple_archiver_list_add(
-            *files_list_out, variable_filename, NULL);
+
+      if (is_equality) {
+        if (strcmp(left_side, right_side) == 0) {
+          // Is equality is TRUE.
+          (*state) |= 0x12;
+        } else {
+          // Is equality is FALSE.
+          (*state) |= 4;
+        }
+      } else {
+        if (strcmp(left_side, right_side) == 0) {
+          // Is inequality is FALSE.
+          (*state) |= 4;
+        } else {
+          // Is inequality is TRUE.
+          (*state) |= 0x12;
+        }
       }
+      c_simple_http_add_string_part(string_part_list, NULL, html_buf_idx + 1);
+    } else if (strncmp(var + 1, "ELSEIF ", 7) == 0) {
+      if (((*state) & 0xE) != 2 && ((*state) & 0xE) != 4) {
+        fprintf(stderr, "ERROR Invalid \"ELSEIF\" (bad state)! %s\n", var);
+        return 1;
+      }
+
+      __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
+      char *left_side = NULL;
+      __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
+      char *right_side = NULL;
+
+      uint_fast8_t is_equality = 0;
+
+      if (c_simple_http_internal_parse_if_expression(
+          wrapped_hash_map,
+          var,
+          1 + 7,
+          var_size,
+          &left_side,
+          &right_side,
+          &is_equality,
+          files_list_out)) {
+        return 1;
+      } else if (!left_side || !right_side) {
+        fprintf(stderr, "ERROR Internal error! %s\n", var);
+        return 1;
+      }
+
+      if (((*state) & 0x10) == 0) {
+        if (is_equality) {
+          if (strcmp(left_side, right_side) == 0) {
+            // Is equality is TRUE.
+            (*state) &= 0xFFFFFFE1;
+            (*state) |= 0x16;
+          } else {
+            // Is equality is FALSE.
+            (*state) &= 0xFFFFFFE1;
+            (*state) |= 8;
+          }
+        } else {
+          if (strcmp(left_side, right_side) == 0) {
+            // Is inequality is FALSE.
+            (*state) &= 0xFFFFFFE1;
+            (*state) |= 8;
+          } else {
+            // Is inequality is TRUE.
+            (*state) &= 0xFFFFFFE1;
+            (*state) |= 0x16;
+          }
+        }
+      } else {
+        // Previous IF/ELSEIF resolved true.
+        (*state) &= 0xFFFFFFF1;
+        (*state) |= 8;
+      }
+      c_simple_http_add_string_part(string_part_list, NULL, html_buf_idx + 1);
+    } else if (strncmp(var + 1, "ELSE", 4) == 0) {
+      if (((*state) & 0x10) == 0) {
+        // No previous expression resolved to true, enabling ELSE block.
+        (*state) &= 0xFFFFFFE1;
+        (*state) |= 0xA;
+      } else {
+        // No expression resolved to true, disabling ELSE block.
+        (*state) &= 0xFFFFFFE1;
+        (*state) |= 0xC;
+      }
+      c_simple_http_add_string_part(string_part_list, NULL, html_buf_idx + 1);
+    } else if (strncmp(var + 1, "ENDIF", 5) == 0) {
+      if (((*state) & 0xE) == 0) {
+        fprintf(
+          stderr,
+          "ERROR Invalid expression (no preceeding if/else)! %s\n",
+          var);
+        return 1;
+      }
+      (*state) &= 0xFFFFFFE1;
+      c_simple_http_add_string_part(string_part_list, NULL, html_buf_idx + 1);
+    } else if (strncmp(var + 1, "INDEX ", 6) == 0) {
+      // Indexing into variable array.
+
+      __attribute__((cleanup(simple_archiver_list_free)))
+      SDArchiverLinkedList *var_parts = simple_archiver_list_init();
+      char buf[64];
+      size_t buf_idx = 0;
+
+      size_t idx = 7;
+      for (; idx < var_size; ++idx) {
+        if (var[idx] != '[') {
+          buf[buf_idx++] = var[idx];
+          if (buf_idx >= 63) {
+            buf[63] = 0;
+            c_simple_http_add_string_part(var_parts, buf, 0);
+            buf_idx = 0;
+          }
+        } else {
+          break;
+        }
+      }
+      if (var[idx] != '[' || idx >= var_size) {
+        fprintf(stderr, "ERROR Syntax error! %s\n", var);
+        return 1;
+      }
+      __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
+      char *var_name = NULL;
+      if (var_parts->count != 0) {
+        if (buf_idx != 0) {
+          buf[buf_idx] = 0;
+          c_simple_http_add_string_part(var_parts, buf, 0);
+          buf_idx = 0;
+        }
+        var_name = c_simple_http_combine_string_parts(var_parts);
+      } else if (buf_idx != 0) {
+        buf[buf_idx] = 0;
+        var_name = strdup(buf);
+      } else {
+        fprintf(stderr, "ERROR Empty variable name string! %s\n", var);
+        return 1;
+      }
+      C_SIMPLE_HTTP_ConfigValue *config_value =
+        simple_archiver_hash_map_get(wrapped_hash_map->hash_map,
+                                     var_name,
+                                     strlen(var_name) + 1);
+      if (!config_value) {
+        fprintf(stderr, "ERROR Variable not found in config! %s\n", var);
+        return 1;
+      }
+
+      idx += 1;
+      ssize_t array_index = 0;
+      for (; idx < var_size; ++idx) {
+        if (var[idx] >= '0' && var[idx] <= '9') {
+          array_index = array_index * 10 + (ssize_t)(var[idx] - '0');
+        } else if (var[idx] == ']') {
+          break;
+        } else {
+          fprintf(stderr, "ERROR Syntax error getting index! %s\n", var);
+          return 1;
+        }
+      }
+      if (idx >= var_size) {
+        fprintf(stderr, "ERROR Syntax error getting index (reached end without "
+            "reaching \"]\")! %s\n", var);
+        return 1;
+      }
+      for (; array_index-- > 0;) {
+        config_value = config_value->next;
+        if (!config_value) {
+          fprintf(stderr, "ERROR Array index out of bounds! %s\n", var);
+          return 1;
+        }
+      }
+      if (!config_value || !config_value->value) {
+        fprintf(
+          stderr, "ERROR Internal error invalid indexed value! %s\n", var);
+        return 1;
+      }
+
+      __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
+      char *value_contents = NULL;
+      uint64_t value_contents_size = 0;
+      if (c_simple_http_internal_ends_with_FILE(var_name) == 0) {
+        value_contents = c_simple_http_FILE_to_c_str(
+          config_value->value, &value_contents_size);
+        if (!value_contents || value_contents_size == 0) {
+          fprintf(stderr, "ERROR Failed to get value from FILE! %s\n", var);
+          return 1;
+        }
+        if (files_list_out) {
+          simple_archiver_list_add(*files_list_out,
+                                   strdup(config_value->value),
+                                   NULL);
+        }
+      } else {
+        value_contents = strdup(config_value->value);
+        value_contents_size = strlen(value_contents);
+      }
+
+      c_simple_http_add_string_part_sized(string_part_list,
+                                          value_contents,
+                                          value_contents_size + 1,
+                                          html_buf_idx + 1);
     } else {
-      // Variable data is "config_value->value".
-      string_part.size = strlen(config_value->value) + 1;
-      string_part.buf = malloc(string_part.size);
-      memcpy(string_part.buf, config_value->value, string_part.size);
-      string_part.buf[string_part.size - 1] = 0;
-      string_part.extra = idx + 1;
+      fprintf(stderr, "ERROR Invalid expression! %s\n", var);
+      return 1;
     }
   } else {
-    string_part.buf = NULL;
-    string_part.size = 0;
-    string_part.extra = idx + 1;
-  }
-  c_simple_http_add_string_part(string_part_list,
-                                string_part.buf,
-                                string_part.extra);
-  if (string_part.buf) {
-    free(string_part.buf);
+    // Refers to a variable by name.
+    C_SIMPLE_HTTP_ConfigValue *config_value =
+      simple_archiver_hash_map_get(
+        wrapped_hash_map->hash_map,
+        var,
+        (uint32_t)var_size + 1);
+    if (config_value && config_value->value) {
+      if (c_simple_http_internal_ends_with_FILE(var) == 0) {
+        // Load from file specified by "config_value->value".
+        uint64_t size = 0;
+        string_part.buf = c_simple_http_FILE_to_c_str(config_value->value, &size);
+        if (!string_part.buf || size == 0) {
+          fprintf(stderr, "ERROR Failed to read from file \"%s\"!\n",
+                  config_value->value);
+          if (string_part.buf) {
+            free(string_part.buf);
+          }
+          return 1;
+        }
+        string_part.size = size + 1;
+        string_part.extra = html_buf_idx + 1;
+
+        string_part.buf[string_part.size - 1] = 0;
+        if (files_list_out) {
+          char *variable_filename = strdup(config_value->value);
+          simple_archiver_list_add(*files_list_out, variable_filename, NULL);
+        }
+      } else {
+        // Variable data is "config_value->value".
+        string_part.size = strlen(config_value->value) + 1;
+        string_part.buf = malloc(string_part.size);
+        memcpy(string_part.buf, config_value->value, string_part.size);
+        string_part.buf[string_part.size - 1] = 0;
+        string_part.extra = html_buf_idx + 1;
+      }
+    } else {
+      string_part.buf = NULL;
+      string_part.size = 0;
+      string_part.extra = html_buf_idx + 1;
+    }
+    c_simple_http_add_string_part(string_part_list,
+                                  string_part.buf,
+                                  string_part.extra);
+    if (string_part.buf) {
+      free(string_part.buf);
+    }
   }
 
   return 0;
@@ -211,6 +607,13 @@ char *c_simple_http_path_to_generated(
 
   // xxxx xxx0 - Initial state, no delimeter reached.
   // xxxx xxx1 - Three left-curly-brace delimeters reached.
+  // xxxx 001x - If expression ALLOW contents.
+  // xxxx 010x - If expression DISALLOW contents.
+  // xxxx 011x - ElseIf expression ALLOW contents.
+  // xxxx 100x - ElseIf expression DISALLOW contents.
+  // xxxx 101x - Else expression ALLOW contents.
+  // xxxx 110x - Else expression DISALLOW contents.
+  // xxx1 xxxx - Previous If/ElseIf had true/ALLOW.
   uint32_t state = 0;
 
   for (; idx < html_buf_size; ++idx) {
@@ -221,23 +624,30 @@ char *c_simple_http_path_to_generated(
         if (delimeter_count >= 3) {
           delimeter_count = 0;
           state |= 1;
-          if (string_part_list->count != 0) {
-            C_SIMPLE_HTTP_String_Part *last_part =
-              string_part_list->tail->prev->data;
-            last_template_idx = last_part->extra;
+          if ((state & 0xE) == 0
+              || (state & 0xE) == 2
+              || (state & 0xE) == 6
+              || (state & 0xE) == 0xA) {
+            if (string_part_list->count != 0) {
+              C_SIMPLE_HTTP_String_Part *last_part =
+                string_part_list->tail->prev->data;
+              last_template_idx = last_part->extra;
+            }
+            string_part.size = idx - last_template_idx - 1;
+            string_part.buf = malloc(string_part.size);
+            memcpy(
+              string_part.buf,
+              html_buf + last_template_idx,
+              string_part.size);
+            string_part.buf[string_part.size - 1] = 0;
+            string_part.extra = idx + 1;
+            c_simple_http_add_string_part(string_part_list,
+                                          string_part.buf,
+                                          string_part.extra);
+            free(string_part.buf);
+          } else {
+            c_simple_http_add_string_part(string_part_list, NULL, idx + 1);
           }
-          string_part.size = idx - last_template_idx - 1;
-          string_part.buf = malloc(string_part.size);
-          memcpy(
-            string_part.buf,
-            html_buf + last_template_idx,
-            string_part.size);
-          string_part.buf[string_part.size - 1] = 0;
-          string_part.extra = idx + 1;
-          c_simple_http_add_string_part(string_part_list,
-                                        string_part.buf,
-                                        string_part.extra);
-          free(string_part.buf);
         }
       } else {
         delimeter_count = 0;
@@ -261,6 +671,7 @@ char *c_simple_http_path_to_generated(
             var_size);
           var[var_size] = 0;
           if (c_simple_http_internal_handle_inside_delimeters(
+                &state,
                 idx,
                 var,
                 var_size,

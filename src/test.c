@@ -620,6 +620,46 @@ int main(int argc, char **argv) {
     CHECK_TRUE(ret == 0);
     CHECK_TRUE(ret2 == 0);
     CHECK_TRUE(ret3 == 0);
+
+    buf = strdup("EndingWithThreeTabs\t\t\t");
+    CHECK_TRUE(c_simple_http_trim_end_whitespace(buf) == 3);
+    CHECK_TRUE(buf[18] == 's');
+    CHECK_TRUE(buf[19] == 0);
+    CHECK_TRUE(buf[20] == 0);
+    CHECK_TRUE(buf[21] == 0);
+    CHECK_TRUE(buf[22] == 0);
+    free(buf);
+    buf = NULL;
+
+    buf = strdup("EndingWithThreeSpaces   ");
+    CHECK_TRUE(c_simple_http_trim_end_whitespace(buf) == 3);
+    CHECK_TRUE(buf[20] == 's');
+    CHECK_TRUE(buf[21] == 0);
+    CHECK_TRUE(buf[22] == 0);
+    CHECK_TRUE(buf[23] == 0);
+    CHECK_TRUE(buf[24] == 0);
+    free(buf);
+    buf = NULL;
+
+    buf = strdup("EndingWithThreeNewlines\n\n\n");
+    CHECK_TRUE(c_simple_http_trim_end_whitespace(buf) == 3);
+    CHECK_TRUE(buf[22] == 's');
+    CHECK_TRUE(buf[23] == 0);
+    CHECK_TRUE(buf[24] == 0);
+    CHECK_TRUE(buf[25] == 0);
+    CHECK_TRUE(buf[26] == 0);
+    free(buf);
+    buf = NULL;
+
+    buf = strdup("EndingWithThreeCarraigeReturns\r\r\r");
+    CHECK_TRUE(c_simple_http_trim_end_whitespace(buf) == 3);
+    CHECK_TRUE(buf[29] == 's');
+    CHECK_TRUE(buf[30] == 0);
+    CHECK_TRUE(buf[31] == 0);
+    CHECK_TRUE(buf[32] == 0);
+    CHECK_TRUE(buf[33] == 0);
+    free(buf);
+    buf = NULL;
   }
 
   // Test html_cache.

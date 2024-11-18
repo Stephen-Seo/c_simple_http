@@ -17,6 +17,7 @@
 #include "helpers.h"
 
 // Standard library includes.
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -31,7 +32,9 @@ int c_simple_http_internal_get_string_part_full_size(void *data, void *ud) {
   C_SIMPLE_HTTP_String_Part *part = data;
   size_t *count = ud;
 
-  *count += part->size - 1;
+  if (part->size > 0) {
+    *count += part->size - 1;
+  }
 
   return 0;
 }
@@ -86,9 +89,36 @@ void c_simple_http_add_string_part(
   C_SIMPLE_HTTP_String_Part *string_part =
     malloc(sizeof(C_SIMPLE_HTTP_String_Part));
 
-  string_part->size = strlen(c_string) + 1;
-  string_part->buf = malloc(string_part->size);
-  memcpy(string_part->buf, c_string, string_part->size);
+  if (c_string) {
+    string_part->size = strlen(c_string) + 1;
+    string_part->buf = malloc(string_part->size);
+    memcpy(string_part->buf, c_string, string_part->size);
+  } else {
+    string_part->size = 0;
+    string_part->buf = NULL;
+  }
+
+  string_part->extra = extra;
+  simple_archiver_list_add(
+    list, string_part, c_simple_http_cleanup_string_part);
+}
+
+void c_simple_http_add_string_part_sized(
+    SDArchiverLinkedList *list,
+    const char *buffer,
+    size_t size,
+    uintptr_t extra) {
+  C_SIMPLE_HTTP_String_Part *string_part =
+    malloc(sizeof(C_SIMPLE_HTTP_String_Part));
+
+  if (buffer && size > 0) {
+    string_part->size = size;
+    string_part->buf = malloc(string_part->size - 1);
+    memcpy(string_part->buf, buffer, string_part->size - 1);
+  } else {
+    string_part->size = 0;
+    string_part->buf = NULL;
+  }
 
   string_part->extra = extra;
 
@@ -262,6 +292,68 @@ void c_simple_http_cleanup_DIR(DIR **fd) {
     closedir(*fd);
     *fd = NULL;
   }
+}
+
+char *c_simple_http_FILE_to_c_str(const char *filename, uint64_t *size_out) {
+  FILE *fd = fopen(filename, "rb");
+  if (!fd) {
+    fprintf(stderr, "ERROR Failed to open %s!\n", filename);
+    return NULL;
+  } else if (fseek(fd, 0, SEEK_END) != 0) {
+    fprintf(stderr, "ERROR Failed to seek to end of %s!\n", filename);
+    fclose(fd);
+    return NULL;
+  }
+
+  long size = ftell(fd);
+  if (size < 0) {
+    fprintf(stderr, "ERROR Failed to get seek pos of end of %s!\n", filename);
+    fclose(fd);
+    return NULL;
+  } else if (size == 0) {
+    fprintf(stderr, "ERROR Size of file \"%s\" is zero!\n", filename);
+    fclose(fd);
+    return NULL;
+  }
+  if (size_out) {
+    *size_out = (uint64_t)size;
+  }
+  char *buf = malloc((uint64_t)size + 1);
+  if (fseek(fd, 0, SEEK_SET) != 0) {
+    fprintf(stderr, "ERROR Failed to seek to beginning of %s!\n", filename);
+    free(buf);
+    fclose(fd);
+    return NULL;
+  } else if (fread(buf, 1, (uint64_t)size, fd) != (uint64_t)size) {
+    fprintf(stderr, "ERROR Failed to read from file %s!\n", filename);
+    free(buf);
+    fclose(fd);
+    return NULL;
+  }
+
+  buf[size] = 0;
+
+  fclose(fd);
+  return buf;
+}
+
+size_t c_simple_http_trim_end_whitespace(char *c_str) {
+  size_t trimmed = 0;
+
+  uint64_t idx= strlen(c_str);
+  for (; idx-- > 0;) {
+    if (c_str[idx] == ' '
+        || c_str[idx] == '\n'
+        || c_str[idx] == '\r'
+        || c_str[idx] == '\t') {
+      c_str[idx] = 0;
+      ++trimmed;
+    } else {
+      break;
+    }
+  }
+
+  return trimmed;
 }
 
 // vim: et ts=2 sts=2 sw=2
