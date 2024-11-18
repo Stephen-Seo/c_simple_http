@@ -49,6 +49,12 @@ int c_simple_http_internal_ends_with_FILE(const char *c_string) {
   return 2;
 }
 
+int c_simple_http_internal_always_return_one(
+    __attribute__((unused)) void *unused_0,
+    __attribute__((unused)) void *unused_1) {
+  return 1;
+}
+
 int c_simple_http_internal_parse_if_expression(
     const C_SIMPLE_HTTP_ParsedConfig *wrapped_hash_map,
     const char *var,
@@ -189,7 +195,7 @@ int c_simple_http_internal_parse_if_expression(
 
   if (idx + 1 < var_size && var[idx] == '=' && var[idx + 1] == '=') {
     *is_equality_out = 1;
-  } else if (idx + 1 < var_size && var[idx] == '!' && var[idx] == '=') {
+  } else if (idx + 1 < var_size && var[idx] == '!' && var[idx + 1] == '=') {
     *is_equality_out = 0;
   } else {
     fprintf(stderr, "ERROR Operation not n/eq! %s\n", var);
@@ -235,6 +241,7 @@ int c_simple_http_internal_handle_inside_delimeters(
     const size_t html_buf_idx,
     const char *var,
     const size_t var_size,
+    SDArchiverLinkedList *state_stack,
     const C_SIMPLE_HTTP_ParsedConfig *wrapped_hash_map,
     SDArchiverLinkedList *string_part_list,
     SDArchiverLinkedList **files_list_out) {
@@ -245,11 +252,6 @@ int c_simple_http_internal_handle_inside_delimeters(
   } else if (var[0] == '!') {
     // Is an expression.
     if (strncmp(var + 1, "IF ", 3) == 0) {
-      if (((*state) & 0xE) != 0) {
-        fprintf(stderr, "ERROR Invalid \"IF\" (bad state)! %s\n", var);
-        return 1;
-      }
-
       __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
       char *left_side = NULL;
       __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
@@ -272,27 +274,51 @@ int c_simple_http_internal_handle_inside_delimeters(
         return 1;
       }
 
-      if (is_equality) {
-        if (strcmp(left_side, right_side) == 0) {
-          // Is equality is TRUE.
-          (*state) |= 0x12;
+      uint32_t *state = malloc(sizeof(uint32_t));
+      *state = 0;
+
+      uint32_t *prev_state = state_stack->count == 0 ? NULL :
+        state_stack->head->next->data;
+
+      if (!prev_state
+          || (((*prev_state) & 7) == 1
+            || ((*prev_state) & 7) == 3
+            || ((*prev_state) & 7) == 5)) {
+        if (is_equality) {
+          if (strcmp(left_side, right_side) == 0) {
+            // Is equality is TRUE.
+            (*state) |= 9;
+          } else {
+            // Is equality is FALSE.
+            (*state) |= 2;
+          }
         } else {
-          // Is equality is FALSE.
-          (*state) |= 4;
+          if (strcmp(left_side, right_side) == 0) {
+            // Is inequality is FALSE.
+            (*state) |= 2;
+          } else {
+            // Is inequality is TRUE.
+            (*state) |= 9;
+          }
         }
       } else {
-        if (strcmp(left_side, right_side) == 0) {
-          // Is inequality is FALSE.
-          (*state) |= 4;
-        } else {
-          // Is inequality is TRUE.
-          (*state) |= 0x12;
-        }
+        // prev_state is not visible, so this nested block shouldn't be.
+        (*state) |= 0xA;
       }
+      simple_archiver_list_add_front(state_stack, state, NULL);
       c_simple_http_add_string_part(string_part_list, NULL, html_buf_idx + 1);
     } else if (strncmp(var + 1, "ELSEIF ", 7) == 0) {
-      if (((*state) & 0xE) != 2 && ((*state) & 0xE) != 4) {
-        fprintf(stderr, "ERROR Invalid \"ELSEIF\" (bad state)! %s\n", var);
+      if (state_stack->count == 0) {
+        fprintf(stderr, "ERROR No previous conditional! %s\n", var);
+        return 1;
+      }
+      uint32_t *state = state_stack->head->next->data;
+      if (((*state) & 7) != 1 && ((*state) & 7) != 2
+          && ((*state) & 7) != 3 && ((*state) & 7) != 4) {
+        fprintf(
+          stderr,
+          "ERROR Invalid \"ELSEIF\" (no previous IF/ELSEIF)! %s\n",
+          var);
         return 1;
       }
 
@@ -318,54 +344,57 @@ int c_simple_http_internal_handle_inside_delimeters(
         return 1;
       }
 
-      if (((*state) & 0x10) == 0) {
+      if (((*state) & 8) == 0) {
         if (is_equality) {
           if (strcmp(left_side, right_side) == 0) {
             // Is equality is TRUE.
-            (*state) &= 0xFFFFFFE1;
-            (*state) |= 0x16;
+            (*state) &= 0xFFFFFFF8;
+            (*state) |= 0xB;
           } else {
             // Is equality is FALSE.
-            (*state) &= 0xFFFFFFE1;
-            (*state) |= 8;
+            (*state) &= 0xFFFFFFF8;
+            (*state) |= 4;
           }
         } else {
           if (strcmp(left_side, right_side) == 0) {
             // Is inequality is FALSE.
-            (*state) &= 0xFFFFFFE1;
-            (*state) |= 8;
+            (*state) &= 0xFFFFFFF8;
+            (*state) |= 4;
           } else {
             // Is inequality is TRUE.
-            (*state) &= 0xFFFFFFE1;
-            (*state) |= 0x16;
+            (*state) &= 0xFFFFFFF8;
+            (*state) |= 0xB;
           }
         }
       } else {
         // Previous IF/ELSEIF resolved true.
-        (*state) &= 0xFFFFFFF1;
-        (*state) |= 8;
-      }
-      c_simple_http_add_string_part(string_part_list, NULL, html_buf_idx + 1);
-    } else if (strncmp(var + 1, "ELSE", 4) == 0) {
-      if (((*state) & 0x10) == 0) {
-        // No previous expression resolved to true, enabling ELSE block.
-        (*state) &= 0xFFFFFFE1;
-        (*state) |= 0xA;
-      } else {
-        // No expression resolved to true, disabling ELSE block.
-        (*state) &= 0xFFFFFFE1;
+        (*state) &= 0xFFFFFFF8;
         (*state) |= 0xC;
       }
       c_simple_http_add_string_part(string_part_list, NULL, html_buf_idx + 1);
-    } else if (strncmp(var + 1, "ENDIF", 5) == 0) {
-      if (((*state) & 0xE) == 0) {
-        fprintf(
-          stderr,
-          "ERROR Invalid expression (no preceeding if/else)! %s\n",
-          var);
+    } else if (strncmp(var + 1, "ELSE", 4) == 0) {
+      if (state_stack->count == 0) {
+        fprintf(stderr, "ERROR No previous IF! %s\n", var);
         return 1;
       }
-      (*state) &= 0xFFFFFFE1;
+      uint32_t *state = state_stack->head->next->data;
+      if (((*state) & 8) == 0) {
+        // No previous expression resolved to true, enabling ELSE block.
+        (*state) &= 0xFFFFFFF8;
+        (*state) |= 0xD;
+      } else {
+        // Previous expression resolved to true, disabling ELSE block.
+        (*state) &= 0xFFFFFFF8;
+        (*state) |= 0xE;
+      }
+      c_simple_http_add_string_part(string_part_list, NULL, html_buf_idx + 1);
+    } else if (strncmp(var + 1, "ENDIF", 5) == 0) {
+      if (state_stack->count == 0) {
+        fprintf(stderr, "ERROR No previous IF! %s\n", var);
+        return 1;
+      }
+      simple_archiver_list_remove_once(
+        state_stack, c_simple_http_internal_always_return_one, NULL);
       c_simple_http_add_string_part(string_part_list, NULL, html_buf_idx + 1);
     } else if (strncmp(var + 1, "INDEX ", 6) == 0) {
       // Indexing into variable array.
@@ -471,6 +500,14 @@ int c_simple_http_internal_handle_inside_delimeters(
                                           value_contents,
                                           value_contents_size + 1,
                                           html_buf_idx + 1);
+    } else if (strncmp(var + 1, "FOREACH ", 8) == 0) {
+      // TODO
+      fprintf(stderr, "ERROR Unimplemented! %s\n", var);
+      return 1;
+    } else if (strncmp(var + 1, "ENDFOREACH", 10) == 0) {
+      // TODO
+      fprintf(stderr, "ERROR Unimplemented! %s\n", var);
+      return 1;
     } else {
       fprintf(stderr, "ERROR Invalid expression! %s\n", var);
       return 1;
@@ -486,7 +523,8 @@ int c_simple_http_internal_handle_inside_delimeters(
       if (c_simple_http_internal_ends_with_FILE(var) == 0) {
         // Load from file specified by "config_value->value".
         uint64_t size = 0;
-        string_part.buf = c_simple_http_FILE_to_c_str(config_value->value, &size);
+        string_part.buf =
+          c_simple_http_FILE_to_c_str(config_value->value, &size);
         if (!string_part.buf || size == 0) {
           fprintf(stderr, "ERROR Failed to read from file \"%s\"!\n",
                   config_value->value);
@@ -607,14 +645,18 @@ char *c_simple_http_path_to_generated(
 
   // xxxx xxx0 - Initial state, no delimeter reached.
   // xxxx xxx1 - Three left-curly-brace delimeters reached.
-  // xxxx 001x - If expression ALLOW contents.
-  // xxxx 010x - If expression DISALLOW contents.
-  // xxxx 011x - ElseIf expression ALLOW contents.
-  // xxxx 100x - ElseIf expression DISALLOW contents.
-  // xxxx 101x - Else expression ALLOW contents.
-  // xxxx 110x - Else expression DISALLOW contents.
-  // xxx1 xxxx - Previous If/ElseIf had true/ALLOW.
   uint32_t state = 0;
+
+  // xxxx x001 - If expression ALLOW contents.
+  // xxxx x010 - If expression DISALLOW contents.
+  // xxxx x011 - ElseIf expression ALLOW contents.
+  // xxxx x100 - ElseIf expression DISALLOW contents.
+  // xxxx x101 - Else expression ALLOW contents.
+  // xxxx x110 - Else expression DISALLOW contents.
+  // xxxx x111 - ForEach expression contents.
+  // xxxx 1xxx - Previous If/ElseIf had true/ALLOW.
+  __attribute__((cleanup(simple_archiver_list_free)))
+  SDArchiverLinkedList *state_stack = simple_archiver_list_init();
 
   for (; idx < html_buf_size; ++idx) {
     if ((state & 1) == 0) {
@@ -624,10 +666,12 @@ char *c_simple_http_path_to_generated(
         if (delimeter_count >= 3) {
           delimeter_count = 0;
           state |= 1;
-          if ((state & 0xE) == 0
-              || (state & 0xE) == 2
-              || (state & 0xE) == 6
-              || (state & 0xE) == 0xA) {
+          uint32_t *state_stack_head = state_stack->count == 0 ? NULL :
+            state_stack->head->next->data;
+          if (!state_stack_head
+              || ((*state_stack_head) & 7) == 1
+                || ((*state_stack_head) & 7) == 3
+                || ((*state_stack_head) & 7) == 5) {
             if (string_part_list->count != 0) {
               C_SIMPLE_HTTP_String_Part *last_part =
                 string_part_list->tail->prev->data;
@@ -675,6 +719,7 @@ char *c_simple_http_path_to_generated(
                 idx,
                 var,
                 var_size,
+                state_stack,
                 wrapped_hash_map,
                 string_part_list,
                 files_list_out) != 0) {
