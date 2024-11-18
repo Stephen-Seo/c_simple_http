@@ -286,6 +286,7 @@ int internal_check_add_value(uint32_t *state,
       config_value->next = malloc(sizeof(C_SIMPLE_HTTP_ConfigValue));
       config_value->next->value = (char*)value;
       config_value->next->next = NULL;
+      free(key);
     } else {
       config_value = malloc(sizeof(C_SIMPLE_HTTP_ConfigValue));
       config_value->value = (char*)value;
