@@ -241,7 +241,7 @@ int c_simple_http_internal_handle_inside_delimeters(
     const size_t html_buf_idx,
     const char *var,
     const size_t var_size,
-    SDArchiverLinkedList *state_stack,
+    SDArchiverLinkedList *if_state_stack,
     const C_SIMPLE_HTTP_ParsedConfig *wrapped_hash_map,
     SDArchiverLinkedList *string_part_list,
     SDArchiverLinkedList **files_list_out) {
@@ -277,13 +277,13 @@ int c_simple_http_internal_handle_inside_delimeters(
       uint32_t *state = malloc(sizeof(uint32_t));
       *state = 0;
 
-      uint32_t *prev_state = state_stack->count == 0 ? NULL :
-        state_stack->head->next->data;
+      uint32_t *prev_if_state = if_state_stack->count == 0 ? NULL :
+        if_state_stack->head->next->data;
 
-      if (!prev_state
-          || (((*prev_state) & 7) == 1
-            || ((*prev_state) & 7) == 3
-            || ((*prev_state) & 7) == 5)) {
+      if (!prev_if_state
+          || (((*prev_if_state) & 7) == 1
+            || ((*prev_if_state) & 7) == 3
+            || ((*prev_if_state) & 7) == 5)) {
         if (is_equality) {
           if (strcmp(left_side, right_side) == 0) {
             // Is equality is TRUE.
@@ -302,17 +302,17 @@ int c_simple_http_internal_handle_inside_delimeters(
           }
         }
       } else {
-        // prev_state is not visible, so this nested block shouldn't be.
+        // prev_if_state is not visible, so this nested block shouldn't be.
         (*state) |= 0xA;
       }
-      simple_archiver_list_add_front(state_stack, state, NULL);
+      simple_archiver_list_add_front(if_state_stack, state, NULL);
       c_simple_http_add_string_part(string_part_list, NULL, html_buf_idx + 1);
     } else if (strncmp(var + 1, "ELSEIF ", 7) == 0) {
-      if (state_stack->count == 0) {
+      if (if_state_stack->count == 0) {
         fprintf(stderr, "ERROR No previous conditional! %s\n", var);
         return 1;
       }
-      uint32_t *state = state_stack->head->next->data;
+      uint32_t *state = if_state_stack->head->next->data;
       if (((*state) & 7) != 1 && ((*state) & 7) != 2
           && ((*state) & 7) != 3 && ((*state) & 7) != 4) {
         fprintf(
@@ -373,11 +373,11 @@ int c_simple_http_internal_handle_inside_delimeters(
       }
       c_simple_http_add_string_part(string_part_list, NULL, html_buf_idx + 1);
     } else if (strncmp(var + 1, "ELSE", 4) == 0) {
-      if (state_stack->count == 0) {
+      if (if_state_stack->count == 0) {
         fprintf(stderr, "ERROR No previous IF! %s\n", var);
         return 1;
       }
-      uint32_t *state = state_stack->head->next->data;
+      uint32_t *state = if_state_stack->head->next->data;
       if (((*state) & 8) == 0) {
         // No previous expression resolved to true, enabling ELSE block.
         (*state) &= 0xFFFFFFF8;
@@ -389,12 +389,12 @@ int c_simple_http_internal_handle_inside_delimeters(
       }
       c_simple_http_add_string_part(string_part_list, NULL, html_buf_idx + 1);
     } else if (strncmp(var + 1, "ENDIF", 5) == 0) {
-      if (state_stack->count == 0) {
+      if (if_state_stack->count == 0) {
         fprintf(stderr, "ERROR No previous IF! %s\n", var);
         return 1;
       }
       simple_archiver_list_remove_once(
-        state_stack, c_simple_http_internal_always_return_one, NULL);
+        if_state_stack, c_simple_http_internal_always_return_one, NULL);
       c_simple_http_add_string_part(string_part_list, NULL, html_buf_idx + 1);
     } else if (strncmp(var + 1, "INDEX ", 6) == 0) {
       // Indexing into variable array.
@@ -656,7 +656,7 @@ char *c_simple_http_path_to_generated(
   // xxxx x111 - ForEach expression contents.
   // xxxx 1xxx - Previous If/ElseIf had true/ALLOW.
   __attribute__((cleanup(simple_archiver_list_free)))
-  SDArchiverLinkedList *state_stack = simple_archiver_list_init();
+  SDArchiverLinkedList *if_state_stack = simple_archiver_list_init();
 
   for (; idx < html_buf_size; ++idx) {
     if ((state & 1) == 0) {
@@ -666,12 +666,12 @@ char *c_simple_http_path_to_generated(
         if (delimeter_count >= 3) {
           delimeter_count = 0;
           state |= 1;
-          uint32_t *state_stack_head = state_stack->count == 0 ? NULL :
-            state_stack->head->next->data;
-          if (!state_stack_head
-              || ((*state_stack_head) & 7) == 1
-                || ((*state_stack_head) & 7) == 3
-                || ((*state_stack_head) & 7) == 5) {
+          uint32_t *if_state_stack_head = if_state_stack->count == 0 ? NULL :
+            if_state_stack->head->next->data;
+          if (!if_state_stack_head
+              || ((*if_state_stack_head) & 7) == 1
+                || ((*if_state_stack_head) & 7) == 3
+                || ((*if_state_stack_head) & 7) == 5) {
             if (string_part_list->count != 0) {
               C_SIMPLE_HTTP_String_Part *last_part =
                 string_part_list->tail->prev->data;
@@ -719,7 +719,7 @@ char *c_simple_http_path_to_generated(
                 idx,
                 var,
                 var_size,
-                state_stack,
+                if_state_stack,
                 wrapped_hash_map,
                 string_part_list,
                 files_list_out) != 0) {
