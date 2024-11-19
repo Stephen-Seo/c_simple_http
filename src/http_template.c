@@ -14,6 +14,8 @@
 // OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 // PERFORMANCE OF THIS SOFTWARE.
 
+// TODO: Update files map, and cleanup DEBUG prints.
+
 #include "http_template.h"
 
 // Standard library includes.
@@ -28,6 +30,70 @@
 // Local includes.
 #include "config.h"
 #include "helpers.h"
+
+typedef struct C_SIMPLE_HTTP_ArrayVar {
+  // Should be the value of the variable, or filename if var ends with _FILE.
+  char *value;
+  struct C_SIMPLE_HTTP_ArrayVar *next;
+} C_SIMPLE_HTTP_ArrayVar;
+
+typedef struct C_SIMPLE_HTTP_ForState {
+  uint64_t idx;
+  // Key is variable name, Value is ArrayVar struct.
+  SDArchiverHashMap *array_vars;
+  uint64_t buf_start_idx;
+} C_SIMPLE_HTTP_ForState;
+
+// Function forward declaration.
+int c_simple_http_internal_handle_inside_delimeters(
+    uint32_t *state,
+    const char *html_buf,
+    const size_t html_buf_idx,
+    const char *var,
+    const size_t var_size,
+    SDArchiverLinkedList *if_state_stack,
+    SDArchiverLinkedList *for_state_stack,
+    const C_SIMPLE_HTTP_ParsedConfig *wrapped_hash_map,
+    SDArchiverLinkedList *string_part_list,
+    SDArchiverLinkedList **files_list_out);
+
+void c_simple_http_internal_cleanup_ArrayVar(
+    C_SIMPLE_HTTP_ArrayVar **array_var) {
+  if (*array_var) {
+    if ((*array_var)->next) {
+      c_simple_http_internal_cleanup_ArrayVar(&(*array_var)->next);
+    }
+    if ((*array_var)->value) {
+      free((*array_var)->value);
+    }
+    free(*array_var);
+    *array_var = NULL;
+  }
+}
+
+void c_simple_http_internal_cleanup_ArrayVar_void(void *data) {
+  c_simple_http_internal_cleanup_ArrayVar((C_SIMPLE_HTTP_ArrayVar**)&data);
+}
+
+void c_simple_http_internal_cleanup_ForState(C_SIMPLE_HTTP_ForState **state) {
+  if (*state) {
+    if ((*state)->array_vars) {
+      simple_archiver_hash_map_free(&(*state)->array_vars);
+    }
+    free(*state);
+    *state = NULL;
+  }
+}
+
+void c_simple_http_internal_cleanup_ForState_void(void *data) {
+  c_simple_http_internal_cleanup_ForState((C_SIMPLE_HTTP_ForState**)&data);
+}
+
+int c_simple_http_internal_free_exact_ForState_in_list(void *data, void *ud) {
+  C_SIMPLE_HTTP_ForState *for_state = data;
+  C_SIMPLE_HTTP_ForState *state_was_top = ud;
+  return for_state == state_was_top ? 1 : 0;
+}
 
 /// Returns 0 if "c_string" ends with "_FILE".
 int c_simple_http_internal_ends_with_FILE(const char *c_string) {
@@ -53,6 +119,38 @@ int c_simple_http_internal_always_return_one(
     __attribute__((unused)) void *unused_0,
     __attribute__((unused)) void *unused_1) {
   return 1;
+}
+
+/// If non-NULL, must not be free'd.
+char *c_simple_http_internal_get_for_var(SDArchiverLinkedList *for_state_stack,
+                                         const char *var) {
+  if (for_state_stack->count == 0) {
+    return NULL;
+  }
+  SDArchiverLLNode *node = for_state_stack->head;
+  while (node) {
+    node = node->next;
+    if (node && node->data) {
+      C_SIMPLE_HTTP_ForState *for_state = node->data;
+      uint64_t idx = for_state->idx;
+      C_SIMPLE_HTTP_ArrayVar *array_var =
+        simple_archiver_hash_map_get(for_state->array_vars,
+                                     var,
+                                     strlen(var) + 1);
+      if (!array_var) {
+        continue;
+      }
+      for(; idx-- > 0;) {
+        array_var = array_var->next;
+        if (!array_var) {
+          return NULL;
+        }
+      }
+      return array_var->value;
+    }
+  }
+
+  return NULL;
 }
 
 int c_simple_http_internal_parse_if_expression(
@@ -235,13 +333,211 @@ int c_simple_http_internal_parse_if_expression(
   return 0;
 }
 
+int c_simple_http_internal_populate_array_vars(
+    char **for_each_var_name,
+    const C_SIMPLE_HTTP_HashMapWrapper *wrapped_hash_map,
+    const char *var,
+    C_SIMPLE_HTTP_ForState *for_state) {
+  C_SIMPLE_HTTP_ConfigValue *config_value =
+    simple_archiver_hash_map_get(wrapped_hash_map->hash_map,
+                                 *for_each_var_name,
+                                 strlen(*for_each_var_name) + 1);
+  if (!config_value || !config_value->value) {
+    fprintf(
+      stderr,
+      "ERROR Given var name \"%s\" not in config! %s\n",
+      *for_each_var_name,
+      var);
+    return 1;
+  }
+  C_SIMPLE_HTTP_ArrayVar *array_var =
+    malloc(sizeof(C_SIMPLE_HTTP_ArrayVar));
+  array_var->next = NULL;
+  C_SIMPLE_HTTP_ArrayVar *current_array_var = array_var;
+
+  const uint_fast8_t is_ends_with_FILE =
+    c_simple_http_internal_ends_with_FILE(*for_each_var_name) == 0
+      ? 1 : 0;
+
+  if (is_ends_with_FILE) {
+    array_var->value = c_simple_http_FILE_to_c_str(config_value->value, NULL);
+    if (!array_var->value) {
+      fprintf(stderr,
+              "ERROR Failed to read from file \"%s\"! %s\n",
+              config_value->value,
+              var);
+      c_simple_http_internal_cleanup_ArrayVar(&array_var);
+      return 1;
+    }
+  } else {
+    array_var->value = strdup(config_value->value);
+  }
+
+  while (config_value) {
+    config_value = config_value->next;
+    if (config_value) {
+      current_array_var->next =
+        malloc(sizeof(C_SIMPLE_HTTP_ArrayVar));
+      current_array_var = current_array_var->next;
+      current_array_var->next = NULL;
+      if (is_ends_with_FILE) {
+        current_array_var->value =
+          c_simple_http_FILE_to_c_str(config_value->value, NULL);
+        if (!current_array_var->value) {
+          fprintf(stderr,
+                  "ERROR Failed to read from file \"%s\"! %s\n",
+                  config_value->value,
+                  var);
+          c_simple_http_internal_cleanup_ArrayVar(&array_var);
+          return 1;
+        }
+      } else {
+        current_array_var->value = strdup(config_value->value);
+      }
+    }
+  }
+
+  if (simple_archiver_hash_map_insert(
+      for_state->array_vars,
+      array_var,
+      *for_each_var_name,
+      strlen(*for_each_var_name) + 1,
+      c_simple_http_internal_cleanup_ArrayVar_void,
+      NULL) != 0) {
+    fprintf(stderr, "ERROR Internal failed to add array_var! %s\n", var);
+    *for_each_var_name = NULL;
+    return 1;
+  }
+
+  return 0;
+}
+
+int c_simple_http_internal_parse_iterate(
+    uint32_t *state,
+    const char *html_buf,
+    uint64_t idx,
+    size_t *delimeter_count,
+    size_t *last_template_idx,
+    SDArchiverLinkedList *if_state_stack,
+    SDArchiverLinkedList *for_state_stack,
+    SDArchiverLinkedList *string_part_list,
+    const C_SIMPLE_HTTP_ParsedConfig *wrapped_hash_map,
+    SDArchiverLinkedList **files_list_out) {
+  C_SIMPLE_HTTP_String_Part string_part;
+  if (((*state) & 1) == 0) {
+    // Using 0x7B instead of left curly-brace due to bug in vim navigation.
+    if (html_buf[idx] == 0x7B) {
+      ++(*delimeter_count);
+      if ((*delimeter_count) >= 3) {
+        (*delimeter_count) = 0;
+        (*state) |= 1;
+        uint32_t *if_state_stack_head = if_state_stack->count == 0 ? NULL :
+          if_state_stack->head->next->data;
+        if ((!if_state_stack_head
+            || ((*if_state_stack_head) & 7) == 1
+              || ((*if_state_stack_head) & 7) == 3
+              || ((*if_state_stack_head) & 7) == 5)
+            && (for_state_stack->count == 0 || ((*state) & 4) != 0)) {
+          if (string_part_list->count != 0 && ((*state) & 2) == 0) {
+            C_SIMPLE_HTTP_String_Part *last_part =
+              string_part_list->tail->prev->data;
+            (*last_template_idx) = last_part->extra;
+          } else if (((*state) & 2) != 0) {
+            // Only skip first "last_part->extra" in FOREACH.
+            *state &= 0xFFFFFFFD;
+          }
+          string_part.size = idx - (*last_template_idx) - 1;
+          string_part.buf = malloc(string_part.size);
+          memcpy(
+            string_part.buf,
+            html_buf + (*last_template_idx),
+            string_part.size);
+          string_part.buf[string_part.size - 1] = 0;
+          string_part.extra = idx + 1;
+          c_simple_http_add_string_part(string_part_list,
+                                        string_part.buf,
+                                        string_part.extra);
+          free(string_part.buf);
+        } else {
+          c_simple_http_add_string_part(string_part_list, NULL, idx + 1);
+        }
+      }
+    } else {
+      (*delimeter_count) = 0;
+    }
+  } else {
+    // (state & 1) is 1
+    // Using 0x7D instead of right curly-brace due to bug in vim navigation.
+    if (html_buf[idx] == 0x7D) {
+      ++(*delimeter_count);
+      if ((*delimeter_count) >= 3) {
+        (*delimeter_count) = 0;
+        (*state) &= 0xFFFFFFFE;
+        C_SIMPLE_HTTP_String_Part *last_part =
+          string_part_list->tail->prev->data;
+        const size_t var_size = idx - 2 - last_part->extra;
+        __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
+        char *var = malloc(var_size + 1);
+        memcpy(
+          var,
+          html_buf + last_part->extra,
+          var_size);
+        var[var_size] = 0;
+        if (c_simple_http_internal_handle_inside_delimeters(
+              state,
+              html_buf,
+              idx,
+              var,
+              var_size,
+              if_state_stack,
+              for_state_stack,
+              wrapped_hash_map,
+              string_part_list,
+              files_list_out) != 0) {
+          return 1;
+        }
+      }
+    } else {
+      (*delimeter_count) = 0;
+    }
+  }
+
+  return 0;
+}
+
+int c_simple_http_internal_for_hash_iter(const void *key,
+                                         size_t size,
+                                         const void *value,
+                                         void *ud) {
+  const C_SIMPLE_HTTP_ArrayVar *array_var = value;
+  C_SIMPLE_HTTP_ForState *for_state = ud;
+
+  for (size_t count = 0; count < for_state->idx; ++count) {
+    array_var = array_var->next;
+    if (!array_var) {
+      return 1;
+    }
+  }
+
+  return 0;
+}
+
+/// Returns zero if all ArrayVars can reach the idx in ForState.
+int c_simple_http_internal_for_has_idx(C_SIMPLE_HTTP_ForState *state) {
+  return simple_archiver_hash_map_iter(state->array_vars,
+                                       c_simple_http_internal_for_hash_iter,
+                                       state);
+}
+
 /// Returns zero on success.
 int c_simple_http_internal_handle_inside_delimeters(
     uint32_t *state,
+    const char *html_buf,
     const size_t html_buf_idx,
     const char *var,
     const size_t var_size,
     SDArchiverLinkedList *if_state_stack,
+    SDArchiverLinkedList *for_state_stack,
     const C_SIMPLE_HTTP_ParsedConfig *wrapped_hash_map,
     SDArchiverLinkedList *string_part_list,
     SDArchiverLinkedList **files_list_out) {
@@ -252,6 +548,10 @@ int c_simple_http_internal_handle_inside_delimeters(
   } else if (var[0] == '!') {
     // Is an expression.
     if (strncmp(var + 1, "IF ", 3) == 0) {
+      if (for_state_stack->count != 0 && ((*state) & 0x4) == 0) {
+        // Skip if in FOREACH but not iterating within FOREACH yet.
+        return 0;
+      }
       __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
       char *left_side = NULL;
       __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
@@ -308,6 +608,10 @@ int c_simple_http_internal_handle_inside_delimeters(
       simple_archiver_list_add_front(if_state_stack, state, NULL);
       c_simple_http_add_string_part(string_part_list, NULL, html_buf_idx + 1);
     } else if (strncmp(var + 1, "ELSEIF ", 7) == 0) {
+      if (for_state_stack->count != 0 && ((*state) & 0x4) == 0) {
+        // Skip if in FOREACH but not iterating within FOREACH yet.
+        return 0;
+      }
       if (if_state_stack->count == 0) {
         fprintf(stderr, "ERROR No previous conditional! %s\n", var);
         return 1;
@@ -373,6 +677,10 @@ int c_simple_http_internal_handle_inside_delimeters(
       }
       c_simple_http_add_string_part(string_part_list, NULL, html_buf_idx + 1);
     } else if (strncmp(var + 1, "ELSE", 4) == 0) {
+      if (for_state_stack->count != 0 && ((*state) & 0x4) == 0) {
+        // Skip if in FOREACH but not iterating within FOREACH yet.
+        return 0;
+      }
       if (if_state_stack->count == 0) {
         fprintf(stderr, "ERROR No previous IF! %s\n", var);
         return 1;
@@ -389,6 +697,10 @@ int c_simple_http_internal_handle_inside_delimeters(
       }
       c_simple_http_add_string_part(string_part_list, NULL, html_buf_idx + 1);
     } else if (strncmp(var + 1, "ENDIF", 5) == 0) {
+      if (for_state_stack->count != 0 && ((*state) & 0x4) == 0) {
+        // Skip if in FOREACH but not iterating within FOREACH yet.
+        return 0;
+      }
       if (if_state_stack->count == 0) {
         fprintf(stderr, "ERROR No previous IF! %s\n", var);
         return 1;
@@ -398,6 +710,11 @@ int c_simple_http_internal_handle_inside_delimeters(
       c_simple_http_add_string_part(string_part_list, NULL, html_buf_idx + 1);
     } else if (strncmp(var + 1, "INDEX ", 6) == 0) {
       // Indexing into variable array.
+
+      if (for_state_stack->count != 0 && ((*state) & 0x4) == 0) {
+        // Skip if in FOREACH but not iterating within FOREACH yet.
+        return 0;
+      }
 
       __attribute__((cleanup(simple_archiver_list_free)))
       SDArchiverLinkedList *var_parts = simple_archiver_list_init();
@@ -501,19 +818,205 @@ int c_simple_http_internal_handle_inside_delimeters(
                                           value_contents_size + 1,
                                           html_buf_idx + 1);
     } else if (strncmp(var + 1, "FOREACH ", 8) == 0) {
-      // TODO
-      fprintf(stderr, "ERROR Unimplemented! %s\n", var);
-      return 1;
+      if (for_state_stack->count != 0 && ((*state) & 4) == 0) {
+        // Don't parse if nested and not running in nested iteration.
+        return 0;
+      }
+
+      __attribute__((cleanup(c_simple_http_internal_cleanup_ForState)))
+      C_SIMPLE_HTTP_ForState *for_state =
+        malloc(sizeof(C_SIMPLE_HTTP_ForState));
+      for_state->array_vars = simple_archiver_hash_map_init();
+      for_state->idx = 0;
+      for_state->buf_start_idx = html_buf_idx + 1;
+
+      char buf[64];
+      size_t buf_idx = 0;
+      __attribute__((cleanup(simple_archiver_list_free)))
+      SDArchiverLinkedList *parts = simple_archiver_list_init();
+
+      size_t idx = 1 + 8;
+      for (; idx < var_size; ++idx) {
+        if (var[idx] != '!') {
+          buf[buf_idx++] = var[idx];
+          if (buf_idx >= 63) {
+            buf[63] = 0;
+            c_simple_http_add_string_part(parts, buf, 0);
+            buf_idx = 0;
+          }
+        } else {
+          char *for_each_var_name = NULL;
+          if (parts->count != 0) {
+            if (buf_idx != 0) {
+              buf[buf_idx] = 0;
+              c_simple_http_add_string_part(parts, buf, 0);
+              buf_idx = 0;
+            }
+            for_each_var_name = c_simple_http_combine_string_parts(parts);
+            simple_archiver_list_free(&parts);
+            parts = simple_archiver_list_init();
+          } else {
+            if (buf_idx == 0) {
+              fprintf(
+                stderr, "ERROR Expected var name before \"!\"! %s\n", var);
+              return 1;
+            }
+            buf[buf_idx] = 0;
+            for_each_var_name = strdup(buf);
+            buf_idx = 0;
+          }
+
+          if(c_simple_http_internal_populate_array_vars(&for_each_var_name,
+                                                        wrapped_hash_map,
+                                                        var,
+                                                        for_state) != 0) {
+            if (for_each_var_name) {
+              free(for_each_var_name);
+            }
+            return 1;
+          }
+        }
+      }
+      if (buf_idx != 0 || parts->count != 0) {
+        // Var-name remaining at end of "var".
+        char *for_each_var_name = NULL;
+        if (parts->count != 0) {
+          if (buf_idx != 0) {
+            buf[buf_idx] = 0;
+            c_simple_http_add_string_part(parts, buf, 0);
+            buf_idx = 0;
+          }
+          for_each_var_name = c_simple_http_combine_string_parts(parts);
+          simple_archiver_list_free(&parts);
+          parts = simple_archiver_list_init();
+        } else {
+          if (buf_idx == 0) {
+            fprintf(
+              stderr, "ERROR Expected var name before \"!\"! %s\n", var);
+            return 1;
+          }
+          buf[buf_idx] = 0;
+          for_each_var_name = strdup(buf);
+          buf_idx = 0;
+        }
+
+        if(c_simple_http_internal_populate_array_vars(&for_each_var_name,
+                                                      wrapped_hash_map,
+                                                      var,
+                                                      for_state) != 0) {
+          if (for_each_var_name) {
+            free(for_each_var_name);
+          }
+          return 1;
+        }
+      }
+
+      simple_archiver_list_add_front(
+        for_state_stack,
+        for_state,
+        c_simple_http_internal_cleanup_ForState_void);
+      for_state = NULL;
+      c_simple_http_add_string_part(string_part_list, NULL, html_buf_idx + 1);
+      fprintf(stderr,
+              "DEBUG FOREACH for_state_stack count is %lu\n",
+              for_state_stack->count);
     } else if (strncmp(var + 1, "ENDFOREACH", 10) == 0) {
-      // TODO
-      fprintf(stderr, "ERROR Unimplemented! %s\n", var);
-      return 1;
+      if (for_state_stack->count == 0) {
+        fprintf(stderr, "ERROR ENDFOREACH but no FOREACH!\n");
+        return 1;
+      } else if (for_state_stack->count != 0 && ((*state) & 4) != 0) {
+        // Don't parse if nested and running in nested iteration.
+        return 0;
+      }
+
+      C_SIMPLE_HTTP_ForState *state_top = for_state_stack->head->next->data;
+
+      const uint64_t end_idx = html_buf_idx + 1 - 3 - 10 - 1 - 3;
+      if (end_idx < state_top->buf_start_idx) {
+        fprintf(stderr, "ERROR Internal invalid idx! %s\n", var);
+        return 1;
+      }
+
+      while (1) {
+        // xxxx xxx0 - Initial state.
+        // xxxx xxx1 - Three left-curly-brace delimeter reached.
+        // xxxx xx1x - Don't update last_template_idx.
+        // xxxx x1xx - Nested in ForEach.
+        uint32_t inner_state = 6;
+        size_t delimeter_count = 0;
+        size_t last_template_idx = state_top->buf_start_idx;
+        for (uint64_t idx = state_top->buf_start_idx; idx < end_idx; ++idx) {
+          if (c_simple_http_internal_parse_iterate(&inner_state,
+                                                   html_buf,
+                                                   idx,
+                                                   &delimeter_count,
+                                                   &last_template_idx,
+                                                   if_state_stack,
+                                                   for_state_stack,
+                                                   string_part_list,
+                                                   wrapped_hash_map,
+                                                   files_list_out) != 0) {
+            return 1;
+          }
+        }
+
+        C_SIMPLE_HTTP_String_Part *last_part =
+          string_part_list->tail->prev->data;
+        if (end_idx > last_part->extra) {
+          size_t size = end_idx - last_part->extra - 1;
+          char *buf = malloc(size + 1);
+          memcpy(buf, html_buf + last_part->extra, size);
+          buf[size] = 0;
+          c_simple_http_add_string_part(string_part_list, buf, end_idx + 1);
+          free(buf);
+        }
+
+        ++state_top->idx;
+
+        if (c_simple_http_internal_for_has_idx(state_top) != 0) {
+          break;
+        }
+      }
+
+      //simple_archiver_list_remove_once(
+      //  for_state_stack,
+      //  c_simple_http_internal_always_return_one,
+      //  NULL);
+
+      // Top may no longer refer to "state_top" when nested FOREACH is added,
+      // so pointer comparison is necessary to remove the correct "state_top".
+      if(simple_archiver_list_remove_once(
+          for_state_stack,
+          c_simple_http_internal_free_exact_ForState_in_list,
+          state_top) != 1) {
+        fprintf(stderr, "ERROR Failed to free a single \"ForState\" entry!\n");
+        return 1;
+      }
+      c_simple_http_add_string_part(string_part_list, NULL, html_buf_idx + 1);
+      fprintf(stderr,
+              "DEBUG ENDFOREACH for_state_stack count is %lu\n",
+              for_state_stack->count);
     } else {
       fprintf(stderr, "ERROR Invalid expression! %s\n", var);
       return 1;
     }
   } else {
     // Refers to a variable by name.
+
+    // Check if ForEach variable.
+    if (for_state_stack->count != 0 && ((*state) & 0x4) != 0) {
+      char *value = c_simple_http_internal_get_for_var(for_state_stack, var);
+      if (value) {
+        c_simple_http_add_string_part(string_part_list,
+                                      value,
+                                      html_buf_idx + 1);
+        return 0;
+      }
+    } else if (((*state) & 4) == 0) {
+      c_simple_http_add_string_part(string_part_list, NULL, html_buf_idx + 1);
+      return 0;
+    }
+
     C_SIMPLE_HTTP_ConfigValue *config_value =
       simple_archiver_hash_map_get(
         wrapped_hash_map->hash_map,
@@ -645,6 +1148,8 @@ char *c_simple_http_path_to_generated(
 
   // xxxx xxx0 - Initial state, no delimeter reached.
   // xxxx xxx1 - Three left-curly-brace delimeters reached.
+  // xxxx xx1x - Don't update last_template_idx.
+  // xxxx x1xx - Nested in ForEach.
   uint32_t state = 0;
 
   // xxxx x001 - If expression ALLOW contents.
@@ -658,77 +1163,22 @@ char *c_simple_http_path_to_generated(
   __attribute__((cleanup(simple_archiver_list_free)))
   SDArchiverLinkedList *if_state_stack = simple_archiver_list_init();
 
+  // List values are ForState structs.
+  __attribute__((cleanup(simple_archiver_list_free)))
+  SDArchiverLinkedList *for_state_stack = simple_archiver_list_init();
+
   for (; idx < html_buf_size; ++idx) {
-    if ((state & 1) == 0) {
-      // Using 0x7B instead of left curly-brace due to bug in vim navigation.
-      if (html_buf[idx] == 0x7B) {
-        ++delimeter_count;
-        if (delimeter_count >= 3) {
-          delimeter_count = 0;
-          state |= 1;
-          uint32_t *if_state_stack_head = if_state_stack->count == 0 ? NULL :
-            if_state_stack->head->next->data;
-          if (!if_state_stack_head
-              || ((*if_state_stack_head) & 7) == 1
-                || ((*if_state_stack_head) & 7) == 3
-                || ((*if_state_stack_head) & 7) == 5) {
-            if (string_part_list->count != 0) {
-              C_SIMPLE_HTTP_String_Part *last_part =
-                string_part_list->tail->prev->data;
-              last_template_idx = last_part->extra;
-            }
-            string_part.size = idx - last_template_idx - 1;
-            string_part.buf = malloc(string_part.size);
-            memcpy(
-              string_part.buf,
-              html_buf + last_template_idx,
-              string_part.size);
-            string_part.buf[string_part.size - 1] = 0;
-            string_part.extra = idx + 1;
-            c_simple_http_add_string_part(string_part_list,
-                                          string_part.buf,
-                                          string_part.extra);
-            free(string_part.buf);
-          } else {
-            c_simple_http_add_string_part(string_part_list, NULL, idx + 1);
-          }
-        }
-      } else {
-        delimeter_count = 0;
-      }
-    } else {
-      // (state & 1) is 1
-      // Using 0x7D instead of right curly-brace due to bug in vim navigation.
-      if (html_buf[idx] == 0x7D) {
-        ++delimeter_count;
-        if (delimeter_count >= 3) {
-          delimeter_count = 0;
-          state &= 0xFFFFFFFE;
-          C_SIMPLE_HTTP_String_Part *last_part =
-            string_part_list->tail->prev->data;
-          const size_t var_size = idx - 2 - last_part->extra;
-          __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
-          char *var = malloc(var_size + 1);
-          memcpy(
-            var,
-            html_buf + last_part->extra,
-            var_size);
-          var[var_size] = 0;
-          if (c_simple_http_internal_handle_inside_delimeters(
-                &state,
-                idx,
-                var,
-                var_size,
-                if_state_stack,
-                wrapped_hash_map,
-                string_part_list,
-                files_list_out) != 0) {
-            return NULL;
-          }
-        }
-      } else {
-        delimeter_count = 0;
-      }
+    if(c_simple_http_internal_parse_iterate(&state,
+                                            html_buf,
+                                            idx,
+                                            &delimeter_count,
+                                            &last_template_idx,
+                                            if_state_stack,
+                                            for_state_stack,
+                                            string_part_list,
+                                            wrapped_hash_map,
+                                            files_list_out) != 0) {
+      return NULL;
     }
   }
 
