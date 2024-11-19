@@ -1004,17 +1004,19 @@ int c_simple_http_internal_handle_inside_delimeters(
     // Refers to a variable by name.
 
     // Check if ForEach variable.
-    if (for_state_stack->count != 0 && ((*state) & 0x4) != 0) {
-      char *value = c_simple_http_internal_get_for_var(for_state_stack, var);
-      if (value) {
-        c_simple_http_add_string_part(string_part_list,
-                                      value,
-                                      html_buf_idx + 1);
+    if (for_state_stack->count != 0) {
+      if (((*state) & 0x4) != 0) {
+        char *value = c_simple_http_internal_get_for_var(for_state_stack, var);
+        if (value) {
+          c_simple_http_add_string_part(string_part_list,
+                                        value,
+                                        html_buf_idx + 1);
+          return 0;
+        }
+      } else if (((*state) & 4) == 0) {
+        c_simple_http_add_string_part(string_part_list, NULL, html_buf_idx + 1);
         return 0;
       }
-    } else if (((*state) & 4) == 0) {
-      c_simple_http_add_string_part(string_part_list, NULL, html_buf_idx + 1);
-      return 0;
     }
 
     C_SIMPLE_HTTP_ConfigValue *config_value =
