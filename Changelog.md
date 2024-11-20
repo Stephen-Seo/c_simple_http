@@ -22,6 +22,21 @@ FOREACH is used like:
     ArrayVar=SecondValue
     ArrayVar=ThirdValue
 
+For multiple variables to expand in FOREACH:
+
+    HTML='''
+        {{{!FOREACH ArrayVar!ArrayVarSecond!ArrayVarThird}}}
+            {{{ArrayVar}}}
+            {{{ArrayVarSecond}}}
+            {{{ArrayVarThird}}}
+        {{{!ENDFOREACH}}}'''
+    ArrayVar=FirstVarOnce
+    ArrayVar=FirstVarTwice
+    ArrayVarSecond=SecondVarOnce
+    ArrayVarSecond=SecondVarTwice
+    ArrayVarThird=ThirdVarOnce
+    ArrayVarThird=ThirdVarTwice
+
 Implemented nestable "IF" and "FOREACH" expressions in templates. In other
 words, there can be `{{{!IF}}}` inside other IF/FOREACH blocks, and vice versa.
 
