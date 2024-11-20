@@ -10,6 +10,21 @@ ELSE is used like: `{{{!ELSE}}}`.
 ENDIF is used like: `{{{!ENDIF}}}`.
 INDEX is used like: `{{{!INDEX ArrayVar[2]}}}`.
 
+Implemented "FOREACH" and "ENDFOREACH" for templates.
+
+FOREACH is used like:
+
+    HTML='''
+        {{{!FOREACH ArrayVar}}}
+            {{{ArrayVar}}}
+        {{{!ENDFOREACH}}}'''
+    ArrayVar=FirstValue
+    ArrayVar=SecondValue
+    ArrayVar=ThirdValue
+
+Implemented nestable "IF" and "FOREACH" expressions in templates. In other
+words, there can be `{{{!IF}}}` inside other IF/FOREACH blocks, and vice versa.
+
 ## Version 1.3
 
 Fix internal erronous buffer declaration.
