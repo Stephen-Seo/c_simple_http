@@ -7,7 +7,9 @@
 Implemented "IF", "ELSEIF", "ELSE", "ENDIF", and "INDEX" for templates.
 
 IF is used like: `{{{!IF Variable==SomeString}}}`.  
+Not equals can also be used: `{{{!IF Variable!=OtherString}}}`.  
 ELSEIF is used like: `{{{!ELSEIF Variable==AnotherString}}}`.  
+Not equals can also be used: `{{{!ELSEIF Variable!=AnotherOtherString}}}`.  
 ELSE is used like: `{{{!ELSE}}}`.  
 ENDIF is used like: `{{{!ENDIF}}}`.  
 INDEX is used like: `{{{!INDEX ArrayVar[2]}}}`.
