@@ -2,6 +2,8 @@
 
 ## Upcoming Changes
 
+## Version 1.4
+
 Implemented "IF", "ELSEIF", "ELSE", "ENDIF", and "INDEX" for templates.
 
 IF is used like: `{{{!IF Variable==SomeString}}}`.  
