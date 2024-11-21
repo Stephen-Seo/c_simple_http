@@ -38,8 +38,12 @@
 #include "helpers.h"
 #include "http_template.h"
 
-int c_simple_http_internal_write_filenames_to_cache_file(void *data, void *ud) {
-  char *filename = data;
+int c_simple_http_internal_write_filenames_to_cache_file(
+    const void *key,
+    __attribute__((unused)) size_t key_size,
+    __attribute__((unused)) const void *value,
+    void *ud) {
+  const char *filename = key;
   FILE *cache_fd = ud;
 
   const size_t filename_size = strlen(filename);
@@ -436,8 +440,8 @@ CACHE_FILE_WRITE_CHECK:
       return -5;
     }
 
-    __attribute__((cleanup(simple_archiver_list_free)))
-    SDArchiverLinkedList *used_filenames = NULL;
+    __attribute__((cleanup(simple_archiver_hash_map_free)))
+    SDArchiverHashMap *used_filenames = NULL;
 
     size_t generated_html_size = 0;
 
@@ -452,10 +456,10 @@ CACHE_FILE_WRITE_CHECK:
       return -4;
     }
 
-    if (simple_archiver_list_get(
-        used_filenames,
-        c_simple_http_internal_write_filenames_to_cache_file,
-        cache_fd)) {
+    if (simple_archiver_hash_map_iter(
+          used_filenames,
+          c_simple_http_internal_write_filenames_to_cache_file,
+          cache_fd) != 0) {
       fprintf(stderr, "ERROR Failed to write filenames to cache file!\n");
       return -6;
     } else if (fwrite("--- BEGIN HTML ---\n", 1, 19, cache_fd) != 19) {

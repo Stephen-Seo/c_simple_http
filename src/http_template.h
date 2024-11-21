@@ -17,13 +17,16 @@
 #ifndef SEODISPARATE_COM_C_SIMPLE_HTTP_HTTP_TEMPLATE_H_
 #define SEODISPARATE_COM_C_SIMPLE_HTTP_HTTP_TEMPLATE_H_
 
-#include "http.h"
 
 // Standard library includes.
 #include <stddef.h>
 
 // Third-party includes.
 #include <SimpleArchiver/src/data_structures/linked_list.h>
+#include <SimpleArchiver/src/data_structures/hash_map.h>
+
+// Local includes.
+#include "http.h"
 
 // Returns non-NULL on success, which must be free'd after use. Takes a path
 // string and templates and returns the generated HTML. If "output_buf_size" is
@@ -35,7 +38,7 @@ char *c_simple_http_path_to_generated(
   const char *path,
   const C_SIMPLE_HTTP_HTTPTemplates *templates,
   size_t *output_buf_size,
-  SDArchiverLinkedList **files_list_out);
+  SDArchiverHashMap **files_set_out);
 
 #endif
 

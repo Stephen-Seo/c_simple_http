@@ -14,8 +14,6 @@
 // OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 // PERFORMANCE OF THIS SOFTWARE.
 
-// TODO: Update files map.
-
 #include "http_template.h"
 
 // Standard library includes.
@@ -25,6 +23,7 @@
 
 // Third party includes.
 #include <SimpleArchiver/src/data_structures/linked_list.h>
+#include <SimpleArchiver/src/data_structures/hash_map.h>
 #include <SimpleArchiver/src/helpers.h>
 
 // Local includes.
@@ -62,7 +61,22 @@ int c_simple_http_internal_handle_inside_delimeters(
     SDArchiverHashMap *array_vars,
     const C_SIMPLE_HTTP_ParsedConfig *wrapped_hash_map,
     SDArchiverLinkedList *string_part_list,
-    SDArchiverLinkedList **files_list_out);
+    SDArchiverHashMap **files_set_out);
+
+void c_simple_http_internal_set_out_insert(SDArchiverHashMap **set,
+                                           const char *str) {
+  if (set
+      && *set
+      && simple_archiver_hash_map_get(*set, str, strlen(str) + 1) == NULL) {
+    simple_archiver_hash_map_insert(
+      *set,
+      (void*)1,
+      strdup(str),
+      strlen(str) + 1,
+      simple_archiver_helper_datastructure_cleanup_nop,
+      NULL);
+  }
+}
 
 void c_simple_http_internal_cleanup_ArrayVar(
     C_SIMPLE_HTTP_ArrayVar **array_var) {
@@ -169,7 +183,7 @@ int c_simple_http_internal_parse_if_expression(
     char **left_side_out,
     char **right_side_out,
     uint_fast8_t *is_equality_out,
-    SDArchiverLinkedList **files_list_out) {
+    SDArchiverHashMap **files_set_out) {
   if (!left_side_out || !right_side_out || !is_equality_out) {
     fprintf(stderr, "ERROR Internal error! %s\n", var);
     return 1;
@@ -288,11 +302,7 @@ int c_simple_http_internal_parse_if_expression(
     }
     c_simple_http_trim_end_whitespace(*left_side_out);
     left_side_size = strlen(*left_side_out);
-    if (files_list_out) {
-      simple_archiver_list_add(*files_list_out,
-                               strdup(config_value->value),
-                               NULL);
-    }
+    c_simple_http_internal_set_out_insert(files_set_out, config_value->value);
   } else {
     *left_side_out = strdup(config_value->value);
     c_simple_http_trim_end_whitespace(*left_side_out);
@@ -346,7 +356,8 @@ int c_simple_http_internal_populate_array_vars(
     const C_SIMPLE_HTTP_HashMapWrapper *wrapped_hash_map,
     const char *var,
     SDArchiverHashMap *array_vars,
-    SDArchiverLinkedList *array_vars_keys) {
+    SDArchiverLinkedList *array_vars_keys,
+    SDArchiverHashMap **files_set_out) {
   C_SIMPLE_HTTP_ConfigValue *config_value =
     simple_archiver_hash_map_get(wrapped_hash_map->hash_map,
                                  *for_each_var_name,
@@ -378,6 +389,7 @@ int c_simple_http_internal_populate_array_vars(
       c_simple_http_internal_cleanup_ArrayVar(&array_var);
       return 1;
     }
+    c_simple_http_internal_set_out_insert(files_set_out, config_value->value);
   } else {
     array_var->value = strdup(config_value->value);
   }
@@ -400,6 +412,8 @@ int c_simple_http_internal_populate_array_vars(
           c_simple_http_internal_cleanup_ArrayVar(&array_var);
           return 1;
         }
+        c_simple_http_internal_set_out_insert(files_set_out,
+                                              config_value->value);
       } else {
         current_array_var->value = strdup(config_value->value);
       }
@@ -438,7 +452,7 @@ int c_simple_http_internal_parse_iterate(
     SDArchiverHashMap *array_vars,
     SDArchiverLinkedList *string_part_list,
     const C_SIMPLE_HTTP_ParsedConfig *wrapped_hash_map,
-    SDArchiverLinkedList **files_list_out) {
+    SDArchiverHashMap **files_set_out) {
   C_SIMPLE_HTTP_String_Part string_part;
   if (((*state) & 1) == 0) {
     // Using 0x7B instead of left curly-brace due to bug in vim navigation.
@@ -511,7 +525,7 @@ int c_simple_http_internal_parse_iterate(
               array_vars,
               wrapped_hash_map,
               string_part_list,
-              files_list_out) != 0) {
+              files_set_out) != 0) {
           return 1;
         }
       }
@@ -561,7 +575,7 @@ int c_simple_http_internal_handle_inside_delimeters(
     SDArchiverHashMap *array_vars,
     const C_SIMPLE_HTTP_ParsedConfig *wrapped_hash_map,
     SDArchiverLinkedList *string_part_list,
-    SDArchiverLinkedList **files_list_out) {
+    SDArchiverHashMap **files_set_out) {
   C_SIMPLE_HTTP_String_Part string_part;
   if (var_size == 0) {
     fprintf(stderr, "ERROR No characters within delimeters!\n");
@@ -588,7 +602,7 @@ int c_simple_http_internal_handle_inside_delimeters(
           &left_side,
           &right_side,
           &is_equality,
-          files_list_out)) {
+          files_set_out)) {
         return 1;
       } else if (!left_side || !right_side) {
         fprintf(stderr, "ERROR Internal error! %s\n", var);
@@ -662,7 +676,7 @@ int c_simple_http_internal_handle_inside_delimeters(
           &left_side,
           &right_side,
           &is_equality,
-          files_list_out)) {
+          files_set_out)) {
         return 1;
       } else if (!left_side || !right_side) {
         fprintf(stderr, "ERROR Internal error! %s\n", var);
@@ -824,11 +838,8 @@ int c_simple_http_internal_handle_inside_delimeters(
           fprintf(stderr, "ERROR Failed to get value from FILE! %s\n", var);
           return 1;
         }
-        if (files_list_out) {
-          simple_archiver_list_add(*files_list_out,
-                                   strdup(config_value->value),
-                                   NULL);
-        }
+        c_simple_http_internal_set_out_insert(files_set_out,
+                                              config_value->value);
       } else {
         value_contents = strdup(config_value->value);
         value_contents_size = strlen(value_contents);
@@ -904,7 +915,8 @@ int c_simple_http_internal_handle_inside_delimeters(
               wrapped_hash_map,
               var,
               array_vars,
-              for_state->array_vars_keys) != 0) {
+              for_state->array_vars_keys,
+              files_set_out) != 0) {
             if (for_each_var_name) {
               free(for_each_var_name);
             }
@@ -940,7 +952,8 @@ int c_simple_http_internal_handle_inside_delimeters(
             wrapped_hash_map,
             var,
             array_vars,
-            for_state->array_vars_keys) != 0) {
+            for_state->array_vars_keys,
+            files_set_out) != 0) {
           if (for_each_var_name) {
             free(for_each_var_name);
           }
@@ -1017,7 +1030,7 @@ int c_simple_http_internal_handle_inside_delimeters(
                                                    array_vars,
                                                    string_part_list,
                                                    wrapped_hash_map,
-                                                   files_list_out) != 0) {
+                                                   files_set_out) != 0) {
             return 1;
           }
         }
@@ -1113,10 +1126,8 @@ int c_simple_http_internal_handle_inside_delimeters(
         string_part.extra = html_buf_idx + 1;
 
         string_part.buf[string_part.size - 1] = 0;
-        if (files_list_out) {
-          char *variable_filename = strdup(config_value->value);
-          simple_archiver_list_add(*files_list_out, variable_filename, NULL);
-        }
+        c_simple_http_internal_set_out_insert(files_set_out,
+                                              config_value->value);
       } else {
         // Variable data is "config_value->value".
         string_part.size = strlen(config_value->value) + 1;
@@ -1145,12 +1156,12 @@ char *c_simple_http_path_to_generated(
     const char *path,
     const C_SIMPLE_HTTP_HTTPTemplates *templates,
     size_t *output_buf_size,
-    SDArchiverLinkedList **files_list_out) {
+    SDArchiverHashMap **files_set_out) {
   if (output_buf_size) {
     *output_buf_size = 0;
   }
-  if (files_list_out) {
-    *files_list_out = simple_archiver_list_init();
+  if (files_set_out) {
+    *files_set_out = simple_archiver_hash_map_init();
   }
   size_t path_len_size_t = strlen(path) + 1;
   if (path_len_size_t > 0xFFFFFFFF) {
@@ -1191,11 +1202,8 @@ char *c_simple_http_path_to_generated(
     }
     html_buf[html_file_size] = 0;
     html_buf_size = (size_t)html_file_size;
-    if (files_list_out) {
-      char *html_filename_copy = malloc(strlen(html_file_value->value) + 1);
-      strcpy(html_filename_copy, html_file_value->value);
-      simple_archiver_list_add(*files_list_out, html_filename_copy, NULL);
-    }
+    c_simple_http_internal_set_out_insert(files_set_out,
+                                          html_file_value->value);
   } else {
     C_SIMPLE_HTTP_ConfigValue *stored_html_config_value =
       simple_archiver_hash_map_get(wrapped_hash_map->hash_map, "HTML", 5);
@@ -1255,7 +1263,7 @@ char *c_simple_http_path_to_generated(
                                             array_vars,
                                             string_part_list,
                                             wrapped_hash_map,
-                                            files_list_out) != 0) {
+                                            files_set_out) != 0) {
       return NULL;
     }
   }

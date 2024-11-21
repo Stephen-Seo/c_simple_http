@@ -99,9 +99,13 @@ void test_internal_cleanup_delete_temporary_file(const char **filename) {
   }
 }
 
-int test_internal_check_matching_string_in_list(void *value, void *ud) {
-  if (value && ud) {
-    if (strcmp(value, ud) == 0) {
+int test_internal_check_matching_string_in_list(
+    const void *key,
+    __attribute__((unused)) size_t key_size,
+    __attribute__((unused)) const void *value,
+    void *ud) {
+  if (key && ud) {
+    if (strcmp(key, ud) == 0) {
       return 1;
     }
   }
@@ -278,18 +282,18 @@ int main(int argc, char **argv) {
 
     size_t output_buf_size;
 
-    __attribute__((cleanup(simple_archiver_list_free)))
-    SDArchiverLinkedList *filenames_list = NULL;
+    __attribute__((cleanup(simple_archiver_hash_map_free)))
+    SDArchiverHashMap *filenames_set = NULL;
 
     __attribute__((cleanup(simple_archiver_helper_cleanup_c_string)))
     char *buf = c_simple_http_path_to_generated(
-        "/", &config, &output_buf_size, &filenames_list);
+        "/", &config, &output_buf_size, &filenames_set);
     ASSERT_TRUE(buf != NULL);
     ASSERT_TRUE(strcmp(buf, "<h1>Test</h1>") == 0);
     CHECK_TRUE(output_buf_size == 13);
-    CHECK_TRUE(filenames_list->count == 0);
+    CHECK_TRUE(filenames_set->count == 0);
     simple_archiver_helper_cleanup_c_string(&buf);
-    simple_archiver_list_free(&filenames_list);
+    simple_archiver_hash_map_free(&filenames_set);
 
     __attribute__((cleanup(test_internal_cleanup_delete_temporary_file)))
     const char *test_http_template_filename2 =
@@ -321,7 +325,7 @@ int main(int argc, char **argv) {
     ASSERT_TRUE(config.paths != NULL);
 
     buf = c_simple_http_path_to_generated(
-        "/", &config, &output_buf_size, &filenames_list);
+        "/", &config, &output_buf_size, &filenames_set);
     ASSERT_TRUE(buf != NULL);
     //printf("%s\n", buf);
     ASSERT_TRUE(
@@ -330,9 +334,9 @@ int main(int argc, char **argv) {
         "<h1> Some text. </h1><br><h2> More text. </h2>")
       == 0);
     CHECK_TRUE(output_buf_size == 46);
-    CHECK_TRUE(filenames_list->count == 0);
+    CHECK_TRUE(filenames_set->count == 0);
     simple_archiver_helper_cleanup_c_string(&buf);
-    simple_archiver_list_free(&filenames_list);
+    simple_archiver_hash_map_free(&filenames_set);
 
     __attribute__((cleanup(test_internal_cleanup_delete_temporary_file)))
     const char *test_http_template_filename3 =
@@ -387,7 +391,7 @@ int main(int argc, char **argv) {
     ASSERT_TRUE(config.paths != NULL);
 
     buf = c_simple_http_path_to_generated(
-        "/", &config, &output_buf_size, &filenames_list);
+        "/", &config, &output_buf_size, &filenames_set);
     ASSERT_TRUE(buf != NULL);
     //printf("%s\n", buf);
     ASSERT_TRUE(
@@ -396,14 +400,14 @@ int main(int argc, char **argv) {
         "<h1> testVar text. </h1><br><h2> testVar2 text. </h2>")
       == 0);
     CHECK_TRUE(output_buf_size == 53);
-    CHECK_TRUE(filenames_list->count == 1);
-    CHECK_TRUE(simple_archiver_list_get(
-        filenames_list,
+    CHECK_TRUE(filenames_set->count == 1);
+    CHECK_TRUE(simple_archiver_hash_map_iter(
+        filenames_set,
         test_internal_check_matching_string_in_list,
         (void*)test_http_template_html_filename)
-      != NULL);
+      != 0);
     simple_archiver_helper_cleanup_c_string(&buf);
-    simple_archiver_list_free(&filenames_list);
+    simple_archiver_hash_map_free(&filenames_set);
 
     __attribute__((cleanup(test_internal_cleanup_delete_temporary_file)))
     const char *test_http_template_filename4 =
@@ -478,7 +482,7 @@ int main(int argc, char **argv) {
     ASSERT_TRUE(config.paths != NULL);
 
     buf = c_simple_http_path_to_generated(
-        "/", &config, &output_buf_size, &filenames_list);
+        "/", &config, &output_buf_size, &filenames_set);
     ASSERT_TRUE(buf != NULL);
     //printf("%s\n", buf);
     ASSERT_TRUE(
@@ -487,17 +491,17 @@ int main(int argc, char **argv) {
         "<h1> some test text in test var file. </h1>")
       == 0);
     CHECK_TRUE(output_buf_size == 43);
-    CHECK_TRUE(filenames_list->count == 2);
-    CHECK_TRUE(simple_archiver_list_get(
-        filenames_list,
+    CHECK_TRUE(filenames_set->count == 2);
+    CHECK_TRUE(simple_archiver_hash_map_iter(
+        filenames_set,
         test_internal_check_matching_string_in_list,
         (void*)test_http_template_html_filename2)
-      != NULL);
-    CHECK_TRUE(simple_archiver_list_get(
-        filenames_list,
+      != 0);
+    CHECK_TRUE(simple_archiver_hash_map_iter(
+        filenames_set,
         test_internal_check_matching_string_in_list,
         (void*)test_http_template_html_var_filename)
-      != NULL);
+      != 0);
     simple_archiver_helper_cleanup_c_string(&buf);
   }
 
