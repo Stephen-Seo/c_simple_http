@@ -4,16 +4,17 @@
 
 Implemented "IF", "ELSEIF", "ELSE", "ENDIF", and "INDEX" for templates.
 
-IF is used like: `{{{!IF Variable==SomeString}}}`.
-ELSEIF is used like: `{{{!ELSEIF Variable==AnotherString}}}`.
-ELSE is used like: `{{{!ELSE}}}`.
-ENDIF is used like: `{{{!ENDIF}}}`.
+IF is used like: `{{{!IF Variable==SomeString}}}`.  
+ELSEIF is used like: `{{{!ELSEIF Variable==AnotherString}}}`.  
+ELSE is used like: `{{{!ELSE}}}`.  
+ENDIF is used like: `{{{!ENDIF}}}`.  
 INDEX is used like: `{{{!INDEX ArrayVar[2]}}}`.
 
 Implemented "FOREACH" and "ENDFOREACH" for templates.
 
 FOREACH is used like:
 
+    PATH=/
     HTML='''
         {{{!FOREACH ArrayVar}}}
             {{{ArrayVar}}}
@@ -24,6 +25,7 @@ FOREACH is used like:
 
 For multiple variables to expand in FOREACH:
 
+    PATH=/
     HTML='''
         {{{!FOREACH ArrayVar!ArrayVarSecond!ArrayVarThird}}}
             {{{ArrayVar}}}
