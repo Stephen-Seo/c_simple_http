@@ -19,6 +19,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <inttypes.h>
 
 // Linux/Unix includes.
 #include <sys/socket.h>
@@ -232,7 +233,7 @@ int c_simple_http_manage_connections(void *data, void *ud) {
     snprintf(
       content_length_buf + content_length_buf_size,
       127 - content_length_buf_size,
-      "%lu\n%n",
+      "%zu\n%n",
       response_size,
       &written);
     if (written <= 0) {
@@ -304,7 +305,7 @@ int c_simple_http_manage_connections(void *data, void *ud) {
       snprintf(
         content_length_buf,
         content_str_len + 1 + 16 + 1,
-        "Content-Length: %lu\n",
+        "Content-Length: %" PRIu64 "\n",
         file_info.buf_size);
       CHECK_ERROR_WRITE_NO_FD(write(
         citem->fd, content_length_buf, content_str_len + 1 + 16));
@@ -385,7 +386,8 @@ int main(int argc, char **argv) {
     socklen_t size = sizeof(ipv6_addr);
     int ret = getsockname(tcp_socket, (struct sockaddr*)&ipv6_addr, &size);
     if (ret == 0) {
-      printf("Listening on port: %u\n", u16_be_swap(ipv6_addr.sin6_port));
+      printf("Listening on port: %" PRIu16 "\n",
+             u16_be_swap(ipv6_addr.sin6_port));
     } else {
       fprintf(
         stderr,
@@ -462,7 +464,7 @@ int main(int argc, char **argv) {
         ++config_try_reload_attempts;
         fprintf(
           stderr,
-          "Attempting to reload config now (try %u of %u)...\n",
+          "Attempting to reload config now (try %" PRIu32 " of %u)...\n",
           config_try_reload_attempts,
           C_SIMPLE_HTTP_TRY_CONFIG_RELOAD_MAX_ATTEMPTS);
         C_SIMPLE_HTTP_ParsedConfig new_parsed_config =
@@ -532,7 +534,7 @@ int main(int argc, char **argv) {
         }
       } else if (read_ret > 0) {
 #ifndef NDEBUG
-        printf("DEBUG inotify_event->mask: %x\n", inotify_event->mask);
+        printf("DEBUG inotify_event->mask: %" PRIx32 "\n", inotify_event->mask);
 #endif
         if ((inotify_event->mask & IN_MODIFY) != 0
             || (inotify_event->mask & IN_CLOSE_WRITE) != 0) {

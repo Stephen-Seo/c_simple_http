@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <inttypes.h>
 
 // POSIX includes.
 #include <unistd.h>
@@ -28,7 +29,10 @@ static int32_t checks_passed = 0;
 
 #define RETURN() \
   do { \
-    fprintf(stderr, "checked %d\npassed  %d\n", checks_checked, checks_passed);\
+    fprintf(stderr, \
+            "checked %" PRId32 "\npassed  %" PRId32 "\n", \
+            checks_checked, \
+            checks_passed); \
     return checks_checked == checks_passed ? 0 : 1; \
   } while (0);
 

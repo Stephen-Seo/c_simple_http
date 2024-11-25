@@ -129,7 +129,7 @@ Args parse_args(int32_t argc, char **argv) {
         exit(1);
       } else {
         printf(
-          "NOTICE set cache-entry-lifetime to %lu\n",
+          "NOTICE set cache-entry-lifetime to %zu\n",
           args.cache_lifespan_seconds);
       }
     } else if (strncmp(argv[0], "--enable-static-dir=", 20) == 0) {
