@@ -29,6 +29,7 @@ typedef struct Args {
   // xxxx xx0x - disable listen on config file for reloading.
   // xxxx xx1x - enable listen on config file for reloading.
   // xxxx x1xx - enable overwrite on generate.
+  // xxxx 1xxx - enable overwrite on generate for static dir.
   uint16_t flags;
   uint16_t port;
   // Does not need to be free'd, this should point to a string in argv.

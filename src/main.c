@@ -363,7 +363,7 @@ int main(int argc, char **argv) {
       puts("Static dir option specified, copying over static dir entries...");
       if (c_simple_http_static_copy_over_dir(args.static_dir,
                                              args.generate_dir,
-                                             (args.flags & 4) != 0 ? 1 : 0)
+                                             (args.flags & 8) != 0 ? 1 : 0)
           != 0) {
         fprintf(stderr, "ERROR during static-dir-entires copying!\n");
         return 1;

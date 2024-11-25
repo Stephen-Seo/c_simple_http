@@ -46,6 +46,7 @@ void print_usage(void) {
   puts("  --enable-static-dir=<DIR>");
   puts("  --generate-dir=<DIR>");
   puts("  --generate-enable-overwrite");
+  puts("  --generate-static-enable-overwrite");
 }
 
 Args parse_args(int32_t argc, char **argv) {
@@ -189,6 +190,8 @@ Args parse_args(int32_t argc, char **argv) {
       }
     } else if (strcmp(argv[0], "--generate-enable-overwrite") == 0) {
       args.flags |= 4;
+    } else if (strcmp(argv[0], "--generate-static-enable-overwrite") == 0) {
+      args.flags |= 8;
     } else {
       fprintf(stderr, "ERROR: Invalid args!\n");
       print_usage();

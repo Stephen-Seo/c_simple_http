@@ -421,8 +421,8 @@ int c_simple_http_static_copy_over_dir(const char *from,
         if (fd) {
           fprintf(
             stderr,
-            "WARNING \"%s\" already exists and --generate-enable-overwrite not "
-              "specified, skipping!\n",
+            "WARNING \"%s\" already exists and "
+              "--generate-static-enable-overwrite not specified, skipping!\n",
             combined_to);
           continue;
         }
