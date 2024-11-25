@@ -6,6 +6,8 @@ Add flag `--generate-static-enable-overwrite`. This flag enables overwriting of
 files from static-dir to generate-dir (if static-dir was specified). Previous
 implementation relied on `--generate-enable-ovewrite` for this behavior.
 
+Minor refactorings related to `printf` and `uintX_t`/`size_t` types.
+
 ## Version 1.4
 
 Implemented "IF", "ELSEIF", "ELSE", "ENDIF", and "INDEX" for templates.
