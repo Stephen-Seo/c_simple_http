@@ -2,6 +2,10 @@
 
 ## Upcoming Changes
 
+Add flag `--generate-static-enable-overwrite`. This flag enables overwriting of
+files from static-dir to generate-dir (if static-dir was specified). Previous
+implementation relied on `--generate-enable-ovewrite` for this behavior.
+
 ## Version 1.4
 
 Implemented "IF", "ELSEIF", "ELSE", "ENDIF", and "INDEX" for templates.
@@ -79,3 +83,7 @@ Features:
   - Reload configuration on SIGUSR1 or by listening (enabled by cmd parameter).
   - Cache served html (enabled by cmd parameter).
   - Serve static files from "static-dir" (enabled by cmd parameter).
+
+<!--
+    vim: textwidth=80 et sw=2 ts=2 sts=2
+-->
