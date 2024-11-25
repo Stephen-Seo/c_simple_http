@@ -17,6 +17,7 @@ A simple HTTP/1.1 server written in C.
       --enable-static-dir=<DIR>
       --generate-dir=<DIR>
       --generate-enable-overwrite
+      --generate-static-enable-overwrite
 
 ## Changelog
 
