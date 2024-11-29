@@ -2,6 +2,11 @@
 
 ## Upcoming Changes
 
+## Version 1.6
+
+Fix usage of `IF` with a `FOREACH` variable when the `IF` is nested in the
+`FOREACH` and is referring to a variable expanded by `FOREACH`.
+
 ## Version 1.5
 
 Add flag `--generate-static-enable-overwrite`. This flag enables overwriting of
