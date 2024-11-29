@@ -2,6 +2,11 @@
 
 ## Upcoming Changes
 
+## Version 1.7
+
+Fix usage of indexing in `IF`.  
+Note this is used like `{{{!IF SomeVar[2]==true}}}`.
+
 ## Version 1.6
 
 Fix usage of `IF` with a `FOREACH` variable when the `IF` is nested in the
