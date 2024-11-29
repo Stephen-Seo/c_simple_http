@@ -180,6 +180,8 @@ int c_simple_http_internal_parse_if_expression(
     const char *var,
     const size_t var_offset,
     const size_t var_size,
+    const uint64_t *for_state_idx,
+    SDArchiverHashMap *array_vars,
     char **left_side_out,
     char **right_side_out,
     uint_fast8_t *is_equality_out,
@@ -269,11 +271,31 @@ int c_simple_http_internal_parse_if_expression(
   simple_archiver_list_free(&var_parts);
   var_parts = simple_archiver_list_init();
 
-  C_SIMPLE_HTTP_ConfigValue *config_value =
-    simple_archiver_hash_map_get(wrapped_hash_map->hash_map,
-                                 var_buf,
-                                 strlen(var_buf) + 1);
-  if (!config_value || !config_value->value) {
+  // At this point, var_buf contains the left-hand-side string that hasn't been
+  // expanded yet.
+
+  // Check if ForEach variable.
+  char *value = NULL;
+  C_SIMPLE_HTTP_ConfigValue *config_value = NULL;
+  if (for_state_idx != NULL) {
+    if (var_index != -1) {
+      fprintf(stderr,
+              "ERROR Invalid indexing on expanded FOREACH variable! %s\n",
+              var);
+      return 1;
+    }
+    value = c_simple_http_internal_get_for_var(var_buf,
+                                               *for_state_idx,
+                                               array_vars);
+  }
+  if (!value) {
+    // No ForEach variable, get as regular variable.
+    config_value =
+      simple_archiver_hash_map_get(wrapped_hash_map->hash_map,
+                                   var_buf,
+                                   strlen(var_buf) + 1);
+  }
+  if (!value && (!config_value || !config_value->value)) {
     fprintf(stderr, "ERROR Invalid VAR after \"IF/ELSEIF\"! %s\n", var);
     return 1;
   } else if (var_index >= 0) {
@@ -291,7 +313,8 @@ int c_simple_http_internal_parse_if_expression(
   uint64_t left_side_size = 0;
   if (c_simple_http_internal_ends_with_FILE(var_buf) == 0) {
     *left_side_out =
-      c_simple_http_FILE_to_c_str(config_value->value, &left_side_size);
+      c_simple_http_FILE_to_c_str(value ? value : config_value->value,
+                                  &left_side_size);
     if (!*left_side_out || left_side_size == 0) {
       fprintf(stderr, "ERROR _FILE variable could not be read! %s\n", var);
       if (*left_side_out) {
@@ -304,7 +327,7 @@ int c_simple_http_internal_parse_if_expression(
     left_side_size = strlen(*left_side_out);
     c_simple_http_internal_set_out_insert(files_set_out, config_value->value);
   } else {
-    *left_side_out = strdup(config_value->value);
+    *left_side_out = strdup(value ? value : config_value->value);
     c_simple_http_trim_end_whitespace(*left_side_out);
     left_side_size = strlen(*left_side_out);
   }
@@ -599,6 +622,8 @@ int c_simple_http_internal_handle_inside_delimeters(
           var,
           1 + 3,
           var_size,
+          (*state) & 0x4 ? &for_state_idx : NULL,
+          array_vars,
           &left_side,
           &right_side,
           &is_equality,
@@ -673,6 +698,8 @@ int c_simple_http_internal_handle_inside_delimeters(
           var,
           1 + 7,
           var_size,
+          (*state) & 0x4 ? &for_state_idx : NULL,
+          array_vars,
           &left_side,
           &right_side,
           &is_equality,
