@@ -229,10 +229,12 @@ int c_simple_http_internal_parse_if_expression(
         fprintf(stderr, "ERROR No closing \"]\"! %s\n", var);
         return 1;
       } else if (
-          idx + 1 < var_size && var[idx] == '!' && var[idx + 1] == '=') {
+          idx + 2 < var_size && var[idx + 1] == '!' && var[idx + 2] == '=') {
+        ++idx;
         break;
       } else if (
-          idx + 1 < var_size && var[idx] == '=' && var[idx + 1] == '=') {
+          idx + 2 < var_size && var[idx + 1] == '=' && var[idx + 2] == '=') {
+        ++idx;
         break;
       } else {
         fprintf(stderr, "ERROR Invalid expression after \"]\"! %s\n", var);
