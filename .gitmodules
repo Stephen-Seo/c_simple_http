@@ -1,3 +1,3 @@
 [submodule "third_party/SimpleArchiver"]
 	path = third_party/SimpleArchiver
-	url = https://git.seodisparate.com/stephenseo/SimpleArchiver.git
+	url = https://github.com/Stephen-Seo/SimpleArchiver.git
