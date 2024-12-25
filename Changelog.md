@@ -2,6 +2,10 @@
 
 ## Upcoming Changes
 
+## Version 1.7.1
+
+Fix submodule url (SimpleArchiver).
+
 ## Version 1.7
 
 Fix usage of indexing in `IF`.  
