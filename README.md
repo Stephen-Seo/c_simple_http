@@ -21,7 +21,7 @@ A simple HTTP/1.1 server written in C.
 
 ## Changelog
 
-See the [Changelog.](https://git.seodisparate.com/stephenseo/c_simple_http/src/branch/main/Changelog.md)
+See the [Changelog.](https://github.com/Stephen-Seo/c_simple_http/blob/main/Changelog.md)
 
 ## Before Compiling
 
@@ -64,4 +64,4 @@ file if the config file has changed.
 The `--enable-cache-dir=<DIR>` option enables caching and sets the "cache-dir"
 at the same time. `--cache-entry-lifetime-seconds=<SECONDS>` determines when a
 cache entry expires.
-[The default expiry time of a cache entry is 1 week.](https://git.seodisparate.com/stephenseo/c_simple_http/src/commit/3f1be0cf496eab7242ab997262d85af11337039b/src/constants.h#L28)
+[The default expiry time of a cache entry is 1 week.](https://github.com/Stephen-Seo/c_simple_http/blob/fca624550f3be0452b8334978392cd679db30fa1/src/constants.h#L31)
