@@ -2,6 +2,10 @@
 
 ## Upcoming Changes
 
+## Version 1.7.2
+
+Update third-party submodule SimpleArchiver.
+
 ## Version 1.7.1
 
 Fix submodule url (SimpleArchiver).
