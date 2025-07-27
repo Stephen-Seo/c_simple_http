@@ -2,6 +2,10 @@
 
 ## Upcoming Changes
 
+## Version 1.7.3
+
+Update third-party submodule SimpleArchiver, fixes related to submodule update.
+
 ## Version 1.7.2
 
 Update third-party submodule SimpleArchiver.
