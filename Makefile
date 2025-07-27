@@ -63,6 +63,7 @@ SOURCES = \
 		src/generate.c \
 		third_party/SimpleArchiver/src/helpers.c \
 		third_party/SimpleArchiver/src/data_structures/linked_list.c \
+		third_party/SimpleArchiver/src/data_structures/chunked_array.c \
 		third_party/SimpleArchiver/src/data_structures/hash_map.c \
 		third_party/SimpleArchiver/src/data_structures/priority_heap.c \
 		third_party/SimpleArchiver/src/algorithms/linear_congruential_gen.c

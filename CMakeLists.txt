@@ -16,6 +16,7 @@ set(c_simple_http_SOURCES
   "${CMAKE_CURRENT_SOURCE_DIR}/src/generate.c"
   "${CMAKE_CURRENT_SOURCE_DIR}/third_party/SimpleArchiver/src/helpers.c"
   "${CMAKE_CURRENT_SOURCE_DIR}/third_party/SimpleArchiver/src/data_structures/linked_list.c"
+  "${CMAKE_CURRENT_SOURCE_DIR}/third_party/SimpleArchiver/src/data_structures/chunked_array.c"
   "${CMAKE_CURRENT_SOURCE_DIR}/third_party/SimpleArchiver/src/data_structures/hash_map.c"
   "${CMAKE_CURRENT_SOURCE_DIR}/third_party/SimpleArchiver/src/data_structures/priority_heap.c"
   "${CMAKE_CURRENT_SOURCE_DIR}/third_party/SimpleArchiver/src/algorithms/linear_congruential_gen.c"
