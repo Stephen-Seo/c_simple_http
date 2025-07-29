@@ -160,8 +160,16 @@ An example of using `FOREACH`:
     ArrayValueThird=ThirdArr1
     ArrayValueFourth=FourthArr0
     ArrayValueFourth=FourthArr1
+    Each_FILE='''first_text.txt'''
+    Each_FILE=other_text.txt
 
 `IF` statements should work regardless of whether or not it is nested.
+
+Any variable declaration supports triple single/double-quoting:
+
+    VariableZero='''value'''
+    VariableOne="""Another Value"""
+    VariableTwo_FILE='''index.html'''
 
 ## Other Notes
 
