@@ -55,6 +55,114 @@ Without this, the project will fail to build.
     # This assumes the server is hosted on port 3000.
     curl localhost:3000
 
+## Template Usage
+
+Variables defined in the config will be expanded in the `HTML` or `HTML_FILE`.
+
+`HTML_FILE` is used like so:
+
+    PATH=/
+    HTML_FILE='''other.html'''
+    MY_VARIABLE='''Some text'''
+
+    <!-- other.html -->
+    <html>
+        <p>A variable is {{{MY_VARIABLE}}}</p>
+    </html>
+
+Note that any variable that ends in `_FILE` will cause the templating system to
+insert the contents of the filename specified by the variable.
+
+A variable can be specified in the html file like: `{{{MY_VARIABLE}}}`.
+
+To specify an array, use the variable multiple times:
+
+    MY_VARIABLE=FirstItem
+    MY_VARIABLE=SecondItem
+    MY_VARIABLE=ThirdItem
+
+Using `{{{MY_VARIABLE}}}` should only return the first element of the array if
+specified, and using `INDEX` can select one of the items by index.
+
+These are the statements that can be used in templating:
+
+ - IF
+ - ELSEIF
+ - ELSE
+ - ENDIF
+ - INDEX
+ - FOREACH
+ - ENDFOREACH
+
+An example of using `IF`:
+
+    PATH=/
+    HTML='''
+        {{{!IF MY_VARIABLE==AString}}}
+            <p>MY_VARIABLE is AString</p>
+        {{{!ELSEIF MY_VARIABLE!=OtherString}}}
+            <p>MY_VARIABLE is not OtherString</p>
+        {{{!ELSE}}}
+            <p>MY_VARIABLE is something else</p>
+        {{{!ENDIF}}}
+    '''
+
+An example of using `INDEX`:
+
+    PATH=/
+    HTML='''
+        {{{!INDEX MY_VARIABLE[0]}}}
+        {{{!INDEX MY_VARIABLE[1]}}}
+        {{{!INDEX MY_VARIABLE[2]}}}
+    '''
+    MY_VARIABLE=FirstItem
+    MY_VARIABLE=SecondItem
+    MY_VARIABLE=ThirdItem
+
+An example of using `FOREACH`:
+
+    PATH=/
+    HTML='''
+        {{{!FOREACH MY_VARIABLE!OTHER_VARIABLE}}}
+            <p>MY_VARIABLE is {{{MY_VARIABLE}}} and OTHER_VARIABLE is {{{OTHER_VARIABLE}}}</p>
+        {{{!ENDFOREACH}}}
+    '''
+    MY_VARIABLE=FirstMy
+    MY_VARIABLE=SecondMy
+    OTHER_VARIABLE=FirstOther
+    OTHER_VARIABLE=SecondOther
+
+`FOREACH` statements can be nested.
+
+    PATH=/
+    HTML='''
+    {{{!FOREACH ArrayValue}}}
+      {{{ArrayValue}}}
+      {{{!FOREACH ArrayValueSecond}}}
+        {{{ArrayValueSecond}}}
+        {{{!FOREACH ArrayValueThird}}}
+          {{{ArrayValueThird}}}
+          {{{!FOREACH ArrayValueFourth}}}
+            {{{ArrayValueFourth}}}
+            {{{!FOREACH Each_FILE}}}
+              {{{Each_FILE}}}
+            {{{!ENDFOREACH}}}
+          {{{!ENDFOREACH}}}
+        {{{!ENDFOREACH}}}
+      {{{!ENDFOREACH}}}
+    {{{!ENDFOREACH}}}
+    '''
+    ArrayValue=FirstArr0
+    ArrayValue=FirstArr1
+    ArrayValueSecond=SecondArr0
+    ArrayValueSecond=SecondArr1
+    ArrayValueThird=ThirdArr0
+    ArrayValueThird=ThirdArr1
+    ArrayValueFourth=FourthArr0
+    ArrayValueFourth=FourthArr1
+
+`IF` statements should work regardless of whether or not it is nested.
+
 ## Other Notes
 
 The config file can be reloaded if the program receives the SIGUSR1 signal.  
