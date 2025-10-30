@@ -2,6 +2,8 @@
 
 ## Upcoming Changes
 
+Refactor how signals (like SIGINT, SIGHUP, SIGTERM) are handled.
+
 ## Version 1.7.3
 
 Update third-party submodule SimpleArchiver, fixes related to submodule update.
