@@ -441,9 +441,11 @@ int main(int argc, char **argv) {
   connection_context.args = &args;
   connection_context.parsed = &parsed_config;
 
-  signal(SIGINT, C_SIMPLE_HTTP_handle_sigint);
-  signal(SIGUSR1, C_SIMPLE_HTTP_handle_sigusr1);
-  signal(SIGPIPE, C_SIMPLE_HTTP_handle_sigpipe);
+  C_SIMPLE_HTTP_set_handle_signal(SIGINT, C_SIMPLE_HTTP_handle_sigint);
+  C_SIMPLE_HTTP_set_handle_signal(SIGHUP, C_SIMPLE_HTTP_handle_sighup);
+  C_SIMPLE_HTTP_set_handle_signal(SIGTERM, C_SIMPLE_HTTP_handle_sigterm);
+  C_SIMPLE_HTTP_set_handle_signal(SIGUSR1, C_SIMPLE_HTTP_handle_sigusr1);
+  C_SIMPLE_HTTP_set_handle_signal(SIGPIPE, C_SIMPLE_HTTP_handle_sigpipe);
 
   int ret;
   ssize_t read_ret;

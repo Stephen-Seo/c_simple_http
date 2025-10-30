@@ -34,6 +34,24 @@ void C_SIMPLE_HTTP_handle_sigint(int signal) {
   }
 }
 
+void C_SIMPLE_HTTP_handle_sighup(int signal) {
+  if (signal == SIGHUP) {
+#ifndef NDEBUG
+    puts("Handling SIGHUP");
+#endif
+    C_SIMPLE_HTTP_KEEP_RUNNING = 0;
+  }
+}
+
+void C_SIMPLE_HTTP_handle_sigterm(int signal) {
+  if (signal == SIGTERM) {
+#ifndef NDEBUG
+    puts("Handling SIGTERM");
+#endif
+    C_SIMPLE_HTTP_KEEP_RUNNING = 0;
+  }
+}
+
 void C_SIMPLE_HTTP_handle_sigusr1(int signal) {
   if (signal == SIGUSR1) {
 #ifndef NDEBUG
@@ -49,6 +67,16 @@ void C_SIMPLE_HTTP_handle_sigpipe(int signal) {
     fprintf(stderr, "WARNING Recieved SIGPIPE\n");
 #endif
   }
+}
+
+int C_SIMPLE_HTTP_set_handle_signal(int signal, void (*handler)(int)) {
+  struct sigaction sa;
+
+  sa.sa_handler = handler;
+  sigemptyset(&sa.sa_mask);
+  sa.sa_flags = 0;
+
+  return sigaction(signal, &sa, NULL);
 }
 
 // vim: et ts=2 sts=2 sw=2
