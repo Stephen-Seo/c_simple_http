@@ -18,8 +18,12 @@
 #define SEODISPARATE_COM_C_SIMPLE_HTTP_SIGNAL_HANDLING_H_
 
 void C_SIMPLE_HTTP_handle_sigint(int signal);
+void C_SIMPLE_HTTP_handle_sighup(int signal);
+void C_SIMPLE_HTTP_handle_sigterm(int signal);
 void C_SIMPLE_HTTP_handle_sigusr1(int signal);
 void C_SIMPLE_HTTP_handle_sigpipe(int signal);
+
+int C_SIMPLE_HTTP_set_handle_signal(int signal, void (*handler)(int));
 
 #endif
 
